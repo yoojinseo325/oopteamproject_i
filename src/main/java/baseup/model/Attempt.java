@@ -1,0 +1,11 @@
+package baseup.model;
+
+import java.time.Instant;
+
+/** 최초 판정과 단서를 모두 저장한다. 힌트를 사용하면 독립 해결로 세지 않는다. */
+public record Attempt(String id, String userId, String questionId, int choice, String clue,
+                      boolean answerCorrect, boolean clueCorrect, boolean hintUsed,
+                      long seconds, Instant at) implements Identifiable {
+    public boolean understood() { return answerCorrect && clueCorrect; }
+    public boolean independent() { return understood() && !hintUsed; }
+}

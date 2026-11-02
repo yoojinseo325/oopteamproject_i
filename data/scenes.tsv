@@ -1,0 +1,25 @@
+id	caption	tokens
+Q01a	타격 전 · 1루에 주자, 타자는 아직 타석에 있습니다.	r1,1루 주자,runner,590,225,kia_na|batter,타자,runner,440,405,kia_kim|pitcher,투수,fielder,400,250,sam_won
+Q01b	판정 순간 · 수비수가 공을 보유하고 먼저 2루를 터치했습니다.	r1,아직 2루 도착 전,runner,495,160,kia_na|def,공 보유 · 2루 터치,fielder,400,112,sam_lee|batter,타자주자,runner,520,345,kia_kim
+Q02a	타격 전 · 주자는 2루에만 있습니다.	r2,2루 주자,runner,400,75,kia_na|empty1,1루 비어 있음,fact,615,240,|batter,타자,runner,440,405,kia_kim
+Q02b	판정 순간 · 베이스만 터치했고 주자의 몸에는 닿지 않았습니다.	r2,3루로 달리는 주자,runner,285,160,kia_na|def,공 보유 · 3루 터치,fielder,200,265,sam_kim|batter,타자주자,runner,520,345,kia_kim
+Q03a	상황 시작 · 주자는 2루와 3루 사이에 있습니다.	runner,베이스 밖 주자,runner,290,190,lg_hong|def,공이 든 글러브,fielder,335,250,han_roh|batter,타자,runner,440,405,lg_moon
+Q03b	판정 순간 · 공이 들어 있는 글러브로 주자를 터치했습니다.	runner,주자,runner,290,190,lg_hong|def,공 든 글러브로 터치,fielder,325,200,han_roh
+Q04a	상황 시작 · 어느 손에 공이 있는지 살펴보세요.	runner,베이스 밖 주자,runner,295,185,lg_hong|empty,터치한 글러브는 비어 있음,fact,410,285,|ball,공은 반대 손,ball,590,170,
+Q04b	판정 순간 · 주자에게 닿은 글러브 안에는 공이 없습니다.	runner,주자,runner,290,190,lg_hong|empty,빈 글러브로 터치,fielder,335,205,han_roh|ball,오른손의 공,ball,510,290,
+Q05a	투구 전 · 현재 카운트를 확인하세요.	count,현재 1볼 2스트라이크,fact,575,120,|batter,타자,runner,440,405,lot_yoon|pitcher,투수,fielder,400,250,kt_go
+Q05b	타격 후 · 일반 스윙의 공이 파울이 되어 포구되지 않았습니다.	ball,잡히지 않은 일반 파울,ball,680,370,|batter,타자,runner,440,405,lot_yoon|count,기존 1B · 2S,fact,400,100,
+Q06a	투구 전 · 이번에는 1스트라이크입니다.	count,현재 2볼 1스트라이크,fact,575,120,|batter,타자,runner,440,405,lot_yoon|pitcher,투수,fielder,400,250,kt_go
+Q06b	타격 후 · 일반 파울, 공은 잡히지 않았습니다.	ball,잡히지 않은 일반 파울,ball,125,365,|batter,타자,runner,440,405,lot_yoon|count,기존 2B · 1S,fact,400,100,
+Q07a	투구 전 · 2스트라이크에서 타자가 번트를 준비합니다.	count,현재 0볼 2스트라이크,fact,575,120,|bunt,번트 시도,runner,440,405,doo_jung|pitcher,투수,fielder,400,250,ssg_kim
+Q07b	타격 후 · 번트한 공이 파울 지역에 멈췄습니다.	ball,번트 파울 · 공이 멈춤,ball,610,425,|bunt,번트한 타자,runner,440,390,doo_jung
+Q08a	투구 전 · 이번에는 1스트라이크입니다.	count,현재 0볼 1스트라이크,fact,575,120,|bunt,번트 시도,runner,440,405,doo_jung|pitcher,투수,fielder,400,250,ssg_kim
+Q08b	타격 후 · 번트 파울, 타자의 다음 상황을 판정하세요.	ball,번트 파울 · 공이 멈춤,ball,610,425,|bunt,번트한 타자,runner,440,390,doo_jung
+Q09a	첫 접촉 순간 · 주자는 아직 3루를 밟고 있습니다.	r3,3루 주자,runner,205,225,kiw_lee|touch,야수가 공에 처음 접촉,fielder,530,100,nc_park|outs,1아웃,fact,120,105,
+Q09b	다음 순간 · 야수가 포구를 완료했고 주자는 홈으로 달립니다.	r3,홈으로 출발한 주자,runner,285,340,kiw_lee|touch,정상 포구 완료,fielder,530,100,nc_park
+Q10a	첫 접촉 전 · 주자는 이미 3루를 떠났습니다.	early,첫 접촉 전에 출발,runner,280,340,kiw_lee|fly,아직 날아가는 공,ball,470,80,|def,외야수,fielder,600,145,nc_park
+Q10b	판정 순간 · 정상 포구 후 수비가 3루에서 어필했습니다.	appeal,공 보유 · 3루 어필,fielder,200,265,nc_hwi|early,3루로 돌아오지 않음,runner,380,385,kiw_lee
+Q11a	타격 전 · 1사, 주자 1·2루입니다.	r1,1루 주자,runner,590,225,nc_ju|r2,2루 주자,runner,400,75,nc_min|runners,주자 1·2루,fact,145,110,|outs,1아웃,fact,660,110,|batter,타자,runner,440,405,nc_park|def,내야 수비,fielder,230,255,kia_kim
+Q11b	판정 순간 · 선언된 페어 뜬공을 수비수가 놓쳤습니다.	r1,1루 주자,runner,590,225,nc_ju|r2,2루 주자,runner,400,75,nc_min|ball,페어 지역에 떨어진 공,ball,440,210,|call,인필드 플라이 선언,fact,155,115,|batter,타자,runner,440,405,nc_park|def,내야 수비,fielder,230,255,kia_kim
+Q12a	타격 전 · 주자는 같지만 이번에는 2아웃입니다.	r1,1루 주자,runner,590,225,nc_ju|r2,2루 주자,runner,400,75,nc_min|outs,2아웃,fact,660,110,|batter,타자,runner,440,405,nc_park|def,내야 수비,fielder,230,255,kia_kim
+Q12b	타격 후 · 페어 뜬공이 내야로 향하고 있습니다.	r1,1루 주자,runner,590,225,nc_ju|r2,2루 주자,runner,400,75,nc_min|ball,쉽게 잡을 수 있는 뜬공,ball,440,190,|outs,2아웃,fact,660,110,|batter,타자,runner,440,405,nc_park|def,내야 수비,fielder,230,255,kia_kim

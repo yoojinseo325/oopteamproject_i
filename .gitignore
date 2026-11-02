@@ -1,0 +1,14 @@
+/build/
+/dist/
+/tmp/
+/userdata/
+/out/
+*.class
+.idea/*
+!.idea/modules.xml
+!.idea/misc.xml
+!.idea/compiler.xml
+!.idea/encodings.xml
+*.iml
+!BaseUp.iml
+.DS_Store
