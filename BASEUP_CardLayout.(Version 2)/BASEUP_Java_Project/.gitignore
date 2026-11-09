@@ -1,0 +1,4 @@
+out/
+.sources.txt
+data/results.txt
+*.class
