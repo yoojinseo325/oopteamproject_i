@@ -50,6 +50,7 @@ public final class QuizSession {
     public void beginClue() {
         require(Stage.JUDGE);
         if (choice < 0) throw new IllegalStateException("먼저 판정을 선택해 주세요.");
+        if (!current().requiresClue()) throw new IllegalStateException("이 문제는 선택한 답을 바로 제출합니다.");
         stage = Stage.CLUE;
     }
     public void chooseClue(String value) { require(Stage.CLUE); clue = value; }
@@ -57,7 +58,7 @@ public final class QuizSession {
         if (stage == Stage.JUDGE || stage == Stage.CLUE) hint = true;
     }
     public void recordSaved(Attempt attempt) {
-        require(Stage.CLUE);
+        require(current().requiresClue() ? Stage.CLUE : Stage.JUDGE);
         results.add(attempt);
         stage = Stage.FEEDBACK;
     }

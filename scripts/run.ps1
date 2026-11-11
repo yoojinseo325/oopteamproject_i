@@ -1,8 +1,8 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 try {
     $projectRoot = Split-Path -Parent $PSScriptRoot
     Set-Location -LiteralPath $projectRoot
-    $jarPath = Join-Path $projectRoot 'dist\BaseUp-v1.jar'
+    $jarPath = Join-Path $projectRoot 'dist\BaseUp.jar'
     if (-not (Test-Path -LiteralPath $jarPath)) { & (Join-Path $PSScriptRoot 'build.ps1') }
     $candidates = @()
     if ($env:JAVA_HOME) { $candidates += (Join-Path $env:JAVA_HOME 'bin\javaw.exe') }

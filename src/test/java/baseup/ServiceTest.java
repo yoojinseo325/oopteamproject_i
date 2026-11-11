@@ -25,14 +25,14 @@ public final class ServiceTest {
     }
     public static void main(String[] args) throws Exception {
         Catalog catalog=new Catalog(Path.of("data"));
-        check(catalog.rules().size()==6,"six rules");check(catalog.questions().size()==12,"twelve questions");
+        check(catalog.rules().size()==34,"integrated rules");check(catalog.questions().size()==52,"integrated questions");
         check(catalog.searchRules("포스").size()>=1,"Korean search");check(catalog.searchRules("없는단어").isEmpty(),"empty search");
         Path temp=Files.createTempDirectory(Path.of("build"),"service-test-");
         Instant now=Instant.parse("2030-01-01T00:00:00Z");Clock clock=Clock.fixed(now,ZoneOffset.UTC);
         LearningService service=new LearningService(catalog,temp,clock);String firstUser=service.user().id();
         check(service.attempts().isEmpty(),"fresh user");check(service.reviewQuestions().isEmpty(),"no unattempted reviews");
         int[] expected={0,1,0,1,0,1,1,0,0,0,0,1};
-        for(int i=0;i<catalog.questions().size();i++) {
+        for(int i=0;i<expected.length;i++) {
             Question q=catalog.questions().get(i);check(q.answer()==expected[i],"curated answer "+q.id());
             QuizSession session=service.start(s->List.of(q));
             rejects(session::beginClue,"reject no choice");rejects(()->session.choose(-1),"invalid choice");
@@ -77,7 +77,7 @@ public final class ServiceTest {
         noteReload.toggleBookmark("tag");noteReload.addNote("tag","둘의 메모");
         noteReload.selectUser(firstUser);check(noteReload.notes("").isEmpty(),"notes isolated");check(!noteReload.bookmarked("tag"),"bookmarks isolated");
         noteReload.selectUser(second.id());check(noteReload.notes("").size()==1,"second user data restored");
-        check(new TopicSelector("포스와 태그").select(noteReload).size()==4,"topic selector");
+        check(new TopicSelector("포스와 태그").select(noteReload).size()==6,"topic selector");
         check(new ReviewSelector().select(noteReload).isEmpty(),"review selector independent");
         Path broken=Files.createTempDirectory(Path.of("build"),"broken-test-");
         Files.writeString(broken.resolve("profiles.tsv"),"wrong-header\n");

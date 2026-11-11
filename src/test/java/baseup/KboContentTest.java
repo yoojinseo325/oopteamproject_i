@@ -21,7 +21,7 @@ public final class KboContentTest {
         check(catalog.teams().size()==10,"ten KBO teams");check(catalog.players().size()==18,"verified player roster");
         Set<String> used=new HashSet<>();
         Path images=Path.of("build/qa/kbo");Files.createDirectories(images);
-        for(Question q:catalog.questions()) {
+        for(Question q:catalog.questions().stream().filter(q->!q.hasImage()).toList()) {
             Matchup matchup=catalog.matchup(q.id());used.add(matchup.offense().id());used.add(matchup.defense().id());
             check(!matchup.offense().equals(matchup.defense()),"opposing teams");
             Map<String,String> identities=new HashMap<>();
@@ -51,8 +51,12 @@ public final class KboContentTest {
         Scene.Token batter=catalog.scene("Q01a").tokens().stream().filter(t->t.id().equals("batter")).findFirst().orElseThrow();
         check(batter.player().name().equals("김도영") && batter.player().team().color()==0xEA0029,"KIA batter is red");
         Path broken=Files.createTempDirectory(Path.of("build"),"kbo-invalid-");
-        for(String file:List.of("teams.tsv","players.tsv","matchups.tsv","scenes.tsv","questions.tsv","rules.tsv"))
-            Files.copy(Path.of("data",file),broken.resolve(file));
+        try(var paths=Files.walk(Path.of("data"))) {
+            for(Path path:paths.toList()) {
+                Path target=broken.resolve(Path.of("data").relativize(path));
+                if(Files.isDirectory(path)) Files.createDirectories(target); else Files.copy(path,target);
+            }
+        }
         rejectEdit(broken,"players.tsv","kia_kim\t김도영\tKIA","kia_kim\t김도영\tUNKNOWN");
         rejectEdit(broken,"scenes.tsv",",kia_kim",",unknown_player");
         rejectEdit(broken,"scenes.tsv",",kia_kim",",sam_kim");

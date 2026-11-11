@@ -14,8 +14,11 @@ public final class Catalog {
     private final Manager<Team> teams;
     private final Manager<Player> players;
     private final Manager<Matchup> matchups;
+    private final Path data;
+    private final List<LearningStep> steps;
     public Catalog(Path data) throws IOException {
-        for (String name : List.of("rules.tsv", "questions.tsv", "scenes.tsv", "teams.tsv", "players.tsv", "matchups.tsv"))
+        this.data = data.toAbsolutePath().normalize();
+        for (String name : List.of("rules.tsv", "questions.tsv", "scenes.tsv", "teams.tsv", "players.tsv", "matchups.tsv", "image_questions.tsv", "steps.tsv"))
             if (!Files.isRegularFile(data.resolve(name))) throw new IOException("필수 파일이 없습니다: " + data.resolve(name));
         teams = new Manager<>(new FileRepository<Team>(data.resolve("teams.tsv"), "id\tname\tshortName\tcolor\taccent",
                 f -> new Team(f[0], f[1], f[2], rgb(f[3]), rgb(f[4])), x -> "").load());
@@ -41,8 +44,26 @@ public final class Catalog {
             }
             return new Scene(f[0], f[1], tokens);
         }, x -> "").load());
+        for (Question q : new FileRepository<Question>(data.resolve("image_questions.tsv"),
+                "id\truleId\ttitle\tlevel\tsituation\tprompt\tchoices\tanswer\tcluePrompt\tclueTarget\thint\texplanation\tmisconception\timageFile\timageGuide\tclueChoices",
+                f -> new Question(f[0], f[1], f[2], f[3], f[4], f[5], List.of(f[6].split("\\|", -1)),
+                        Integer.parseInt(f[7]), f[8], f[9], f[10], f[11], f[12], "", "", f[13], f[14],
+                        f[15].isBlank() ? List.of() : Arrays.stream(f[15].split("\\|", -1)).map(value -> {
+                            String[] pair = value.split(":", 2);
+                            return new Question.Clue(pair[0], pair[1]);
+                        }).toList()), x -> "").load()) {
+            if (questions.find(q.id()).isPresent()) throw new IOException("중복 문제 ID: " + q.id());
+            questions.add(q);
+        }
+        List<LearningStep> loaded = new ArrayList<>();
+        // 파일 행 순서가 화면의 STEP 번호, key는 기존 학습 기록을 연결하는 영구 ID다.
+        for (StepRow row : new FileRepository<StepRow>(data.resolve("steps.tsv"), "id\tgoal\tquestionIds",
+                f -> new StepRow(f[0], f[1], List.of(f[2].split("\\|", -1))), x -> "").load())
+            loaded.add(new LearningStep(loaded.size() + 1, Integer.parseInt(row.id()), row.goal(), row.questions()));
+        steps = List.copyOf(loaded);
         validate();
     }
+    private record StepRow(String id, String goal, List<String> questions) implements Identifiable { }
     private static int rgb(String text) {
         if (!text.matches("#[0-9a-fA-F]{6}")) throw new IllegalArgumentException("색상은 #RRGGBB 형식이어야 합니다.");
         return Integer.parseInt(text.substring(1),16);
@@ -57,10 +78,26 @@ public final class Catalog {
                     throw new IOException("장면 토큰 오류: " + scene.id() + " / " + t.id());
         }
         for (Question q : questions.all()) {
-            if (rules.find(q.ruleId()).isEmpty() || scenes.find(q.beforeScene()).isEmpty() || scenes.find(q.afterScene()).isEmpty())
-                throw new IOException("문제의 규칙/장면 연결 오류: " + q.id());
+            if (rules.find(q.ruleId()).isEmpty()) throw new IOException("문제의 규칙 연결 오류: " + q.id());
             if (q.choices().size() < 2 || q.answer() < 0 || q.answer() >= q.choices().size())
                 throw new IOException("정답 번호 오류: " + q.id());
+            if (q.choices().stream().anyMatch(String::isBlank) || q.title().isBlank() || q.prompt().isBlank())
+                throw new IOException("문제 내용 누락: " + q.id());
+            if (q.hasImage()) {
+                Path path = imagePath(q);
+                if (!Files.isRegularFile(path) || javax.imageio.ImageIO.read(path.toFile()) == null)
+                    throw new IOException("그림 파일을 읽을 수 없습니다: " + q.id() + " / " + path);
+                Set<String> ids = new HashSet<>();
+                for (Question.Clue clue : q.clueOptions())
+                    if (clue.id().isBlank() || clue.text().isBlank() || !ids.add(clue.id()) || Attempt.NO_CLUE.equals(clue.id()))
+                        throw new IOException("그림 문제 단서 오류: " + q.id());
+                if (q.requiresClue() && (q.clueOptions().size() < 2 || !ids.contains(q.clueTarget()) || q.cluePrompt().isBlank()))
+                    throw new IOException("그림 문제의 정답 단서 누락: " + q.id());
+                if (!q.requiresClue() && !q.clueOptions().isEmpty()) throw new IOException("기초 문제에 불필요한 단서가 있습니다: " + q.id());
+                continue;
+            }
+            if (scenes.find(q.beforeScene()).isEmpty() || scenes.find(q.afterScene()).isEmpty() || !q.requiresClue())
+                throw new IOException("문제의 장면/단서 연결 오류: " + q.id());
             if (scene(q.beforeScene()).tokens().stream().noneMatch(t -> t.id().equals(q.clueTarget())))
                 throw new IOException("타격 전 장면에 정답 단서가 없습니다: " + q.id());
             Matchup matchup = matchups.find(q.id()).orElseThrow(() -> new IOException("문제의 구단 배정이 없습니다: " + q.id()));
@@ -76,6 +113,26 @@ public final class Catalog {
             }
         }
         for (Matchup matchup : matchups.all()) if (questions.find(matchup.id()).isEmpty()) throw new IOException("없는 문제의 구단 배정: " + matchup.id());
+        Set<Integer> keys = new HashSet<>(); Set<String> assigned = new HashSet<>();
+        for (LearningStep step : steps) {
+            if (step.key() < 1 || !keys.add(step.key()) || step.questionIds().isEmpty() || step.questionIds().size() > 4 || step.goal().isBlank())
+                throw new IOException("STEP 구성 오류: " + step.number());
+            for (String id : step.questionIds())
+                if (questions.find(id).isEmpty() || !assigned.add(id)) throw new IOException("STEP 문제 누락/중복: " + id);
+        }
+        if (assigned.size() != questions.all().size()) throw new IOException("모든 문제를 STEP에 한 번씩 배정해 주세요.");
+    }
+    public List<LearningStep> steps() { return steps; }
+    public Path imagePath(Question q) throws IOException {
+        if (!q.hasImage() || !q.imageFile().matches("[A-Za-z0-9_-]+\\.png")) throw new IOException("허용되지 않는 그림 파일명: " + q.id());
+        Path root = data.resolve("images").toRealPath();
+        Path path = root.resolve(q.imageFile()).toRealPath();
+        if (!path.startsWith(root)) throw new IOException("그림 경로가 images 폴더 밖입니다: " + q.id());
+        return path;
+    }
+    public List<Question.Clue> clues(Question q) {
+        return q.hasImage() ? q.clueOptions() : scene(q.beforeScene()).tokens().stream()
+                .map(t -> new Question.Clue(t.id(), t.displayLabel())).toList();
     }
     public List<Team> teams() { return teams.all(); }
     public List<Player> players() { return players.all(); }

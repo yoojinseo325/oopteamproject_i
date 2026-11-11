@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
 $jdkCandidates = @()
@@ -17,6 +17,6 @@ New-Item -ItemType Directory -Force -Path $classes,(Join-Path $projectRoot 'dist
 $sources = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src\main\java') -Filter '*.java' -Recurse | ForEach-Object FullName)
 & $compiler --release 17 -encoding UTF-8 -d $classes @sources
 if ($LASTEXITCODE -ne 0) { throw 'Java compilation failed.' }
-& $jarTool "-J-Djava.io.tmpdir=$classes" --create --file (Join-Path $projectRoot 'dist\BaseUp-v1.jar') --main-class baseup.App -C $classes .
+& $jarTool "-J-Djava.io.tmpdir=$classes" --create --file (Join-Path $projectRoot 'dist\BaseUp.jar') --main-class baseup.App -C $classes .
 if ($LASTEXITCODE -ne 0) { throw 'JAR creation failed.' }
-Write-Output 'Build complete: dist\BaseUp-v1.jar'
+Write-Output 'Build complete: dist\BaseUp.jar'

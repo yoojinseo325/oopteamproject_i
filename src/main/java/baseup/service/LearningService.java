@@ -23,13 +23,6 @@ public final class LearningService {
     private final Manager<StudyNote> notes;
     private final Repository<StepCompletion> completionRepository;
     private final Manager<StepCompletion> completions;
-    private static final List<LearningStep> STEPS = List.of(
-            new LearningStep(1, "장면에서 결정적인 단서 찾기", List.of("Q01", "Q03")),
-            new LearningStep(2, "조건이 달라져도 스스로 판단하기", List.of("Q02", "Q04")),
-            new LearningStep(3, "새로운 상황에서 기준 세우기", List.of("Q05", "Q07")),
-            new LearningStep(4, "비슷해 보이는 상황 구별하기", List.of("Q06", "Q08")),
-            new LearningStep(5, "여러 단서를 함께 살펴보기", List.of("Q09", "Q11")),
-            new LearningStep(6, "조건을 종합해 판정 완성하기", List.of("Q10", "Q12")));
     private UserProfile currentUser;
 
     public LearningService(Catalog catalog, Path userDir) throws IOException {
@@ -85,21 +78,20 @@ public final class LearningService {
         return created;
     }
     public QuizSession start(QuestionSelector selector) { return new QuizSession(selector.select(this), currentUser.id(), clock); }
-    public List<LearningStep> steps() { return STEPS; }
+    public List<LearningStep> steps() { return catalog.steps(); }
     public LearningStep step(int number) {
-        if (number < 1 || number > STEPS.size()) throw new IllegalArgumentException("없는 단계입니다.");
-        return STEPS.get(number - 1);
+        if (number < 1 || number > steps().size()) throw new IllegalArgumentException("없는 단계입니다.");
+        return steps().get(number - 1);
     }
     public int completedSteps() {
-        int count = 0;
-        for (LearningStep step : STEPS) {
-            if (completions.find(currentUser.id() + ":" + step.number()).isEmpty()) break;
-            count++;
-        }
-        return count;
+        return (int) steps().stream().filter(s -> stepCompleted(s.number())).count();
     }
-    public boolean stepUnlocked(int number) { step(number); return number <= completedSteps() + 1; }
-    public boolean courseComplete() { return completedSteps() == STEPS.size(); }
+    public boolean stepCompleted(int number) { return completions.find(currentUser.id() + ":" + step(number).key()).isPresent(); }
+    public int nextStepNumber() {
+        return steps().stream().filter(s -> !stepCompleted(s.number())).mapToInt(LearningStep::number).findFirst().orElse(steps().size());
+    }
+    public boolean stepUnlocked(int number) { return stepCompleted(number) || number == nextStepNumber(); }
+    public boolean courseComplete() { return completedSteps() == steps().size(); }
     public boolean discovered(String ruleId) {
         return attempts().stream().anyMatch(a -> catalog.question(a.questionId()).map(q -> q.ruleId().equals(ruleId)).orElse(false));
     }
@@ -107,7 +99,7 @@ public final class LearningService {
         return new QuizSession(new StepSelector(number).select(this), currentUser.id(), clock, number);
     }
     public QuizSession startNext() {
-        if (!courseComplete()) return startStep(completedSteps() + 1);
+        if (!courseComplete()) return startStep(nextStepNumber());
         List<Question> selected = adaptiveQuestions(List.of(), 4);
         if (selected.isEmpty()) {
             selected = catalog.questions().stream()
@@ -121,14 +113,15 @@ public final class LearningService {
         if (!session.userId().equals(currentUser.id())) throw new IllegalStateException("미션을 시작한 사용자로 돌아가 주세요.");
         if (session.stage() != QuizSession.Stage.FEEDBACK) throw new IllegalStateException("해설을 먼저 확인해 주세요.");
         if (session.index() + 1 == session.size() && session.stepNumber() > 0) {
-            String id = currentUser.id() + ":" + session.stepNumber();
+            int key = step(session.stepNumber()).key();
+            String id = currentUser.id() + ":" + key;
             if (completions.find(id).isEmpty()) saveAdded(completionRepository, completions,
-                    new StepCompletion(id, currentUser.id(), session.stepNumber(), clock.instant()));
+                    new StepCompletion(id, currentUser.id(), key, clock.instant()));
         }
         session.next();
     }
-    private List<Attempt> ruleAttempts(String ruleId) {
-        return attempts().stream().filter(a -> catalog.question(a.questionId()).map(q -> q.ruleId().equals(ruleId)).orElse(false)).toList();
+    private List<Attempt> ruleAttempts(String key) {
+        return attempts().stream().filter(a -> catalog.question(a.questionId()).map(q -> q.reviewKey().equals(key)).orElse(false)).toList();
     }
     private boolean ruleDue(String ruleId) {
         List<Attempt> history = ruleAttempts(ruleId);
@@ -142,8 +135,11 @@ public final class LearningService {
     }
     public List<Question> adaptiveQuestions(List<Question> core, int limit) {
         Set<String> coreRules = new HashSet<>();
-        core.forEach(q -> coreRules.add(q.ruleId()));
-        List<String> rules = catalog.rules().stream().map(RuleConcept::id)
+        core.forEach(q -> coreRules.add(q.reviewKey()));
+        Set<String> eligible = new HashSet<>();
+        steps().stream().filter(s -> stepUnlocked(s.number())).forEach(s -> eligible.addAll(s.questionIds()));
+        attempts().forEach(a -> eligible.add(a.questionId()));
+        List<String> rules = catalog.questions().stream().map(Question::reviewKey).distinct()
                 .filter(id -> !coreRules.contains(id) && ruleDue(id))
                 .sorted(Comparator.<String, Boolean>comparing(id -> {
                     List<Attempt> h = ruleAttempts(id); return h.get(h.size() - 1).independent();
@@ -157,7 +153,7 @@ public final class LearningService {
             Attempt last = history.get(history.size() - 1);
             boolean struggling = history.size() >= 2 && !last.independent() && !history.get(history.size() - 2).independent();
             // 반복해서 막히면 기본 상황으로 돌아가고, 그 외에는 직전과 다른 조건을 우선한다.
-            catalog.questions().stream().filter(q -> q.ruleId().equals(rule))
+            catalog.questions().stream().filter(q -> q.reviewKey().equals(rule) && eligible.contains(q.id()))
                     .sorted(Comparator.comparingInt((Question q) -> struggling && !q.level().equals("기본") ? 1 : 0)
                             .thenComparing(q -> q.id().equals(last.questionId())))
                     .findFirst().ifPresent(selected::add);
@@ -166,13 +162,15 @@ public final class LearningService {
     }
     public Attempt submit(QuizSession session) throws IOException {
         if (!session.userId().equals(currentUser.id())) throw new IllegalStateException("미션을 시작한 사용자로 돌아가 주세요.");
-        if (session.stage() != QuizSession.Stage.CLUE || session.clue().isBlank())
-            throw new IllegalStateException("장면 또는 아래 버튼에서 단서를 선택해 주세요.");
         Question q = session.current();
-        if (catalog.scene(q.beforeScene()).tokens().stream().noneMatch(t -> t.id().equals(session.clue())))
+        QuizSession.Stage expected = q.requiresClue() ? QuizSession.Stage.CLUE : QuizSession.Stage.JUDGE;
+        if (session.stage() != expected || session.choice() < 0 || (q.requiresClue() && session.clue().isBlank()))
+            throw new IllegalStateException(q.requiresClue() ? "답과 단서를 선택해 주세요." : "먼저 답을 선택해 주세요.");
+        if (q.requiresClue() && catalog.clues(q).stream().noneMatch(t -> t.id().equals(session.clue())))
             throw new IllegalArgumentException("유효한 단서가 아닙니다.");
         Attempt attempt = new Attempt(UUID.randomUUID().toString(), currentUser.id(), q.id(), session.choice(),
-                session.clue(), q.isAnswerCorrect(session.choice()), q.isClueCorrect(session.clue()), session.hintUsed(),
+                q.requiresClue() ? session.clue() : Attempt.NO_CLUE, q.isAnswerCorrect(session.choice()),
+                q.requiresClue() && q.isClueCorrect(session.clue()), session.hintUsed(),
                 Math.max(0, Duration.between(session.started(), clock.instant()).getSeconds()), clock.instant());
         saveAdded(attemptRepository, attempts, attempt);
         session.recordSaved(attempt);

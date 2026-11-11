@@ -18,5 +18,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Service tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Step flow tests failed.' }
 & $java -cp "build/classes;$testClasses" baseup.KboContentTest
 if ($LASTEXITCODE -ne 0) { throw 'KBO content tests failed.' }
+& $java -cp "build/classes;$testClasses" baseup.ContentIntegrationTest
+if ($LASTEXITCODE -ne 0) { throw 'Integrated content tests failed.' }
 & $java -cp "build/classes;$testClasses" baseup.UiSmokeTest
 if ($LASTEXITCODE -ne 0) { throw 'UI tests failed.' }

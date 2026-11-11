@@ -27,7 +27,7 @@ public final class MainFrame extends JFrame {
     private String currentPage = "home";
 
     public MainFrame(LearningService service) {
-        super("BASEUP · 야구를 읽는 첫걸음 | Version 1"); this.service=service;
+        super("BASEUP · 야구를 읽는 첫걸음 | V1 + V2 통합"); this.service=service;
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosing(java.awt.event.WindowEvent e) { if (leaveQuiz()) { dispose(); System.exit(0); } }
@@ -38,7 +38,7 @@ public final class MainFrame extends JFrame {
         top.add(location,BorderLayout.WEST); top.add(xp,BorderLayout.EAST); main.add(top,BorderLayout.NORTH);
         main.add(workspace,BorderLayout.CENTER);
         JPanel footer=new JPanel(new BorderLayout()); footer.setBackground(BG); footer.setBorder(new EmptyBorder(9,30,12,30));
-        footer.add(status,BorderLayout.WEST); footer.add(label("BASEUP / V1.2",11,MUTED,true),BorderLayout.EAST);
+        footer.add(status,BorderLayout.WEST); footer.add(label("BASEUP / V2.1",11,MUTED,true),BorderLayout.EAST);
         main.add(footer,BorderLayout.SOUTH); super.add(main,BorderLayout.CENTER);
         setMinimumSize(new Dimension(1100,760));
         Dimension screen=Toolkit.getDefaultToolkit().getScreenSize();
@@ -96,17 +96,17 @@ public final class MainFrame extends JFrame {
         Theme.add(p,label(subtitle,14,MUTED,false));gap(p,24);return p;
     }
     private JTextArea paragraph(String value,int rows) { JTextArea a=text(value,14,MUTED);a.setRows(rows);return a; }
-    private String nextAction() { return service.courseComplete() ? "새로운 조합으로 도전   →" : "STEP " + (service.completedSteps()+1) + " 시작하기   →"; }
+    private String nextAction() { return service.courseComplete() ? "새로운 조합으로 도전   →" : "STEP " + service.nextStepNumber() + " 시작하기   →"; }
     private void startNext() {
-        try { showQuiz(service.startNext(), service.courseComplete()?"계속 도전":"STEP "+(service.completedSteps()+1)); }
+        try { showQuiz(service.startNext(), service.courseComplete()?"계속 도전":"STEP "+service.nextStepNumber()); }
         catch(Exception e) { error(e); }
     }
     private JComponent home() {
-        boolean done=service.courseComplete(); int current=Math.min(service.completedSteps()+1,service.steps().size());
+        boolean done=service.courseComplete(); int current=service.nextStepNumber();
         JPanel p=page("YOUR NEXT BASE", "다음 판정은, 시작하면 펼쳐져요.", service.user().nickname()+"님, 한 단계씩 나만의 심판 감각을 키워 보세요.");
         RoundedPanel hero=new RoundedPanel(PALE,22); hero.setLayout(new BorderLayout(20,0));
         JPanel left=column(); Theme.add(left,label(done?"ALL BASES CLEAR":"NOW PLAYING   /   STEP "+current,11,GREEN,true));gap(left,14);
-        Theme.add(left,label(done?"여섯 단계를 모두 완주했어요!":service.step(current).goal(),25,INK,true));gap(left,12);
+        Theme.add(left,label(done?"모든 단계를 완주했어요!":service.step(current).goal(),25,INK,true));gap(left,12);
         Theme.add(left,paragraph(done?"익숙한 규칙도 다른 조건에서는 새로운 도전이 됩니다.\n지금 필요한 판단을 섞어서 다시 만나 보세요.":"어떤 상황이 기다릴지는 아직 비밀이에요.\n장면을 만나고, 판단하고, 해설을 확인하며 앞으로 나아가요.",3));gap(left,14);
         Theme.add(left,button(nextAction(),true,this::startNext));gap(left,12);
         Theme.add(left,label("한 번에 2~4개 상황  ·  시간제한 없음  ·  실수해도 다음 단계로",12,MUTED,false));
@@ -121,7 +121,7 @@ public final class MainFrame extends JFrame {
     private JPanel stats() {
         JPanel row=new JPanel(new GridLayout(1,3,15,0)); row.setOpaque(false);
         row.add(stat("완료한 단계",service.completedSteps()+" / "+service.steps().size(),"한 단계씩 열리는 나의 경로"));
-        row.add(stat("스스로 해결한 상황",service.solvedCount()+"개","판정 + 단서 정답 · 힌트 없이"));
+        row.add(stat("스스로 해결한 상황",service.solvedCount()+"개","답과 필요한 단서 정답 · 힌트 없이"));
         row.add(stat("차곡차곡 쌓인 경험",service.xp()+" XP",service.rank()));
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE,125));return row;
     }
@@ -130,9 +130,9 @@ public final class MainFrame extends JFrame {
         card.add(label(number,28,INK,true),BorderLayout.CENTER);card.add(label(sub,11,MUTED,false),BorderLayout.SOUTH);return card;
     }
     private JPanel missionCards() {
-        JPanel path=column();int completed=service.completedSteps();
+        JPanel path=column();
         for(LearningStep step:service.steps()) {
-            boolean done=step.number()<=completed, unlocked=service.stepUnlocked(step.number());
+            boolean done=service.stepCompleted(step.number()), unlocked=service.stepUnlocked(step.number());
             RoundedPanel item=new RoundedPanel(done?WHITE:unlocked?PALE:new Color(0xECEFEB),18);
             item.setLayout(new BorderLayout(18,0));item.setBorder(new EmptyBorder(17,20,17,20));
             RoundedPanel badge=new RoundedPanel(done?GREEN:unlocked?WHITE:LINE,48);badge.setBorder(new EmptyBorder(0,0,0,0));badge.setLayout(new BorderLayout());
@@ -166,7 +166,7 @@ public final class MainFrame extends JFrame {
         JPanel p=page("MISSION COMPLETE","판정 하나만큼, 성장했어요.",session.stepNumber()>0?"STEP "+session.stepNumber()+" 완료 · "+(service.courseComplete()?"모든 단계를 완주했어요!":"다음 단계가 열렸어요."):"새로운 상황에서도 판단의 기준을 떠올려 보세요.");
         RoundedPanel result=card();result.setLayout(new BorderLayout(20,10));
         JPanel words=column();Theme.add(words,label(independent==session.size()?"NICE CALL!":"GOOD PRACTICE!",34,GREEN,true));gap(words,16);
-        Theme.add(words,label("판정과 단서 모두 정답   "+correct+" / "+session.size(),22,INK,true));gap(words,12);
+        Theme.add(words,label("이해한 문제   "+correct+" / "+session.size(),22,INK,true));gap(words,12);
         Theme.add(words,label("힌트 없이 해결한 상황   "+independent+"개",15,MUTED,false));gap(words,12);
         Theme.add(words,paragraph("헷갈렸던 판단은 다음 도전의 다른 상황 속에서 다시 만나요.\n익숙해진 판단은 간격을 두고 돌아옵니다. 따로 정리할 숙제는 없어요.",2));
         result.add(words,BorderLayout.CENTER);Theme.add(p,result);gap(p,20);
@@ -208,7 +208,7 @@ public final class MainFrame extends JFrame {
                 JTextArea summary=paragraph(r.summary(),2);summary.setForeground(GREEN);Theme.add(info,summary);gap(info,14);
                 Theme.add(info,paragraph(r.detail(),7));gap(info,18);
                 Theme.add(info,label("독립 해결   "+service.mastery(r.id())+" / "+service.questionCount(r.id())+" 상황",13,GREEN,true));gap(info,16);
-                Theme.add(info,paragraph("확인 출처: "+r.source()+"\n2026-10-28 확인 · 입문 상황으로 단순화",3));
+                Theme.add(info,paragraph("확인 출처: "+r.source()+"\n학습을 위해 단순화한 상황입니다.",3));
                 card.add(info,BorderLayout.CENTER);
                 JPanel actions=new JPanel(new GridLayout(0,1,0,10));actions.setOpaque(false);
                 actions.add(button(service.bookmarked(r.id())?"북마크 해제":"북마크에 추가",false,()->{
@@ -225,7 +225,7 @@ public final class MainFrame extends JFrame {
     private JComponent records() {
         JPanel p=page("MY SCOREBOOK","결과보다, 이해의 깊이.","제출한 판정과 단서, 힌트 사용 기록이 사용자별로 남습니다.");Theme.add(p,stats());gap(p,24);
         Theme.add(p,label("규칙별 독립 해결",19,INK,true));gap(p,16);
-        JPanel rules=new JPanel(new GridLayout(2,3,12,12));rules.setOpaque(false);
+        JPanel rules=new JPanel(new GridLayout(0,3,12,12));rules.setOpaque(false);
         for(RuleConcept r:service.catalog().rules().stream().filter(r->service.discovered(r.id())).toList()) {
             RoundedPanel c=card();c.setLayout(new BorderLayout(0,12));c.add(label(r.title(),14,INK,true),BorderLayout.NORTH);
             JProgressBar bar=new JProgressBar(0,(int)service.questionCount(r.id()));bar.setValue(service.mastery(r.id()));
@@ -235,7 +235,7 @@ public final class MainFrame extends JFrame {
         List<Attempt> history=new ArrayList<>(service.attempts());Collections.reverse(history);
         DateTimeFormatter date=DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.systemDefault());
         for(Attempt a:history) model.addRow(new Object[]{date.format(a.at()),service.catalog().question(a.questionId()).map(Question::title).orElse("삭제된 문항 "+a.questionId()),
-                a.answerCorrect()?"정답":"다시 보기",a.clueCorrect()?"정답":"다시 보기",a.hintUsed()?"사용":"없음",a.seconds()+"초"});
+                a.answerCorrect()?"정답":"다시 보기",a.clueRequired()?(a.clueCorrect()?"정답":"다시 보기"):"해당 없음",a.hintUsed()?"사용":"없음",a.seconds()+"초"});
         JTable table=new JTable(model);table.setRowHeight(36);table.setShowGrid(false);table.setIntercellSpacing(new Dimension(0,0));
         table.getTableHeader().setFont(font(12,true));table.getTableHeader().setBackground(PALE);table.setFillsViewportHeight(true);
         table.getColumnModel().getColumn(1).setPreferredWidth(230);table.setAutoCreateRowSorter(true);

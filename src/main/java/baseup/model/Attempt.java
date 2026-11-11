@@ -6,6 +6,8 @@ import java.time.Instant;
 public record Attempt(String id, String userId, String questionId, int choice, String clue,
                       boolean answerCorrect, boolean clueCorrect, boolean hintUsed,
                       long seconds, Instant at) implements Identifiable {
-    public boolean understood() { return answerCorrect && clueCorrect; }
+    public static final String NO_CLUE = "@not-required";
+    public boolean clueRequired() { return !NO_CLUE.equals(clue); }
+    public boolean understood() { return answerCorrect && (!clueRequired() || clueCorrect); }
     public boolean independent() { return understood() && !hintUsed; }
 }
