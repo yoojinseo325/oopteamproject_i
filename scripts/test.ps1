@@ -14,6 +14,10 @@ $tests = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src\test\java') -
 if ($LASTEXITCODE -ne 0) { throw 'Test compilation failed.' }
 & $java -cp "build/classes;$testClasses" baseup.ServiceTest
 if ($LASTEXITCODE -ne 0) { throw 'Service tests failed.' }
+& $java -cp "build/classes;$testClasses" baseup.RuleEncyclopediaTest
+if ($LASTEXITCODE -ne 0) { throw 'Rule encyclopedia tests failed.' }
+& $java -cp "build/classes;$testClasses" baseup.RepositoryContractTest
+if ($LASTEXITCODE -ne 0) { throw 'Repository contract tests failed.' }
 & $java -cp "build/classes;$testClasses" baseup.StepFlowTest
 if ($LASTEXITCODE -ne 0) { throw 'Step flow tests failed.' }
 & $java -cp "build/classes;$testClasses" baseup.KboContentTest

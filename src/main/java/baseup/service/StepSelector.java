@@ -9,7 +9,7 @@ public final class StepSelector implements QuestionSelector {
     private final int step;
     public StepSelector(int step) { this.step = step; }
 
-    @Override public List<Question> select(LearningService service) {
+    @Override public List<Question> select(QuestionSource service) {
         if (!service.stepUnlocked(step)) throw new IllegalStateException("앞 단계를 먼저 마쳐 주세요.");
         List<Question> core = service.step(step).questionIds().stream()
                 .map(id -> service.catalog().question(id).orElseThrow()).toList();

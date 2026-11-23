@@ -1,6 +1,6 @@
 # V1 + V2 통합 안내
 
-현재 버전은 **2.1.0**, 총 **26 STEP / 52문항 / 34개 개념**입니다. 모든 학습 화면은 기존 `baseup.App`으로 실행합니다.
+현재 버전은 **2.1.0**, 총 **26 STEP / 52문항 / 40개 개념(백과사전 전용 6개 포함)**입니다. 모든 학습 화면은 기존 `baseup.App`으로 실행합니다.
 
 ## 가져온 내용
 
@@ -60,8 +60,12 @@ V2 삽화의 인물은 일반적인 야구 선수 그림입니다. KBO 선수·�
 | 선수·구단 | `data/players.tsv`, `data/teams.tsv` |
 | 개념과 제출 후 카드 | `data/rules.tsv` |
 | 순서·STEP 확장 | `data/steps.tsv` |
-| 화면·그림 | `ui/QuizPanel.java`, `ui/ImageView.java`, `ui/FieldPanel.java` |
-| 출제·저장·복습 | `service/LearningService.java`, `service/StepSelector.java` |
+| 홈·경로·규칙·기록·메모 | `ui/HomePanel.java`, `ui/LearningPathPanel.java`, `ui/RuleLibraryPanel.java`, `ui/RecordsPanel.java`, `ui/NotesPanel.java` |
+| 퀴즈 조립·입력·해설 | `ui/QuizPanel.java`, `ui/QuizAnswerPanel.java`, `ui/QuizFeedbackPanel.java` |
+| 그림·도식 | `ui/ImageQuestionPanel.java`, `ui/SceneQuestionPanel.java`, `ui/ImageView.java`, `ui/FieldPanel.java` |
+| 출제·복습 | `service/StepSelector.java`, `service/ReviewPolicy.java` |
+| 진도·XP | `service/LearningProgress.java`, `service/LearningStatistics.java` |
+| 저장·흐름 조정 | `repository/UserRepositories.java`, `repository/FileRepository.java`, `service/LearningService.java` |
 
 1. 수정할 문항 ID 범위를 팀원끼리 나눕니다. 각자 기능 브랜치에서 작업합니다.
 2. 같은 규칙은 기존 ruleId에 연결하고, 새 문항과 새 STEP에는 재사용하지 않은 ID를 부여합니다.
@@ -76,3 +80,16 @@ V2 삽화의 인물은 일반적인 야구 선수 그림입니다. KBO 선수·�
 `userdata/` 형식은 유지합니다. 기존 STEP ID 1~6의 완료 기록이 새로운 위치에 연결되고, 기존 문항 ID·XP·북마크·메모도 유지됩니다. 새로운 기초 단계는 새로 풀어야 합니다. V2의 익명 요약 결과 파일은 사용자·문항별 판단 근거를 알 수 없어 자동 병합하지 않습니다.
 
 `build.cmd`로 빌드하고 `run.cmd`로 실행합니다. 배포하려면 `powershell -ExecutionPolicy Bypass -File scripts/package.ps1`을 실행하세요. 결과는 `dist/BaseUp-share.zip`이며 `data/images/`가 포함되고 개인 기록은 제외됩니다. JAR만 단독으로 옮기지 말고 ZIP의 전체 폴더를 옮기세요.
+
+## 규칙 백과사전·검색 (기능 5·6)
+
+로직은 `service/RuleEncyclopedia.java`, 문자열 정규화는 `common/TextNormalizer.java`에 있습니다. 화면 상태를 갖지 않으므로 UI 어디서든 `new RuleEncyclopedia(service.catalog())`로 만들어 씁니다.
+
+| 메서드 | 용도 |
+| --- | --- |
+| `categories()`, `byCategory()`, `rulesIn(category)` | 분류 목차와 분류별 규칙 목록 (`category`가 `null`이면 전체) |
+| `search(query)`, `search(query, category)` | 관련도 순 검색. 빈 검색어면 전체 목록 |
+| `searchHits(query, category)` | 점수와 맞은 위치(`MatchField`: 제목/키워드/요약/설명/분류/출처) 포함 |
+| `find(id)`, `related(id, limit)` | 규칙 하나 찾기, 같이 보면 좋은 규칙 |
+
+검색 점수는 제목 완전 일치 100 > 키워드 완전 일치 95 > 제목 시작 90 > 제목 포함 80 > 키워드 포함 70 > 문장 속 제목/키워드("보크가 뭐야") 60/55 > 요약 40 > 설명 25 > 분류 20 > 출처 15입니다. 여러 단어 검색은 모든 단어가 맞은 규칙을 우선합니다. 단답형 채점(기능 7)은 `TextNormalizer.matchesAny(입력, 허용답안목록)`을 그대로 쓸 수 있습니다. 검사는 `RuleEncyclopediaTest`에 있습니다.

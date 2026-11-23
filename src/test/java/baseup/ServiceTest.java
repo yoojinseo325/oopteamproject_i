@@ -25,7 +25,7 @@ public final class ServiceTest {
     }
     public static void main(String[] args) throws Exception {
         Catalog catalog=new Catalog(Path.of("data"));
-        check(catalog.rules().size()==34,"integrated rules");check(catalog.questions().size()==52,"integrated questions");
+        check(catalog.rules().size()==40,"integrated rules");check(catalog.questions().size()==52,"integrated questions");
         check(catalog.searchRules("포스").size()>=1,"Korean search");check(catalog.searchRules("없는단어").isEmpty(),"empty search");
         Path temp=Files.createTempDirectory(Path.of("build"),"service-test-");
         Instant now=Instant.parse("2030-01-01T00:00:00Z");Clock clock=Clock.fixed(now,ZoneOffset.UTC);

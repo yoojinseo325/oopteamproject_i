@@ -11,12 +11,19 @@ import java.nio.file.Path;
 public final class ImageView extends JPanel {
     private final BufferedImage image;
     public ImageView(Path file, String description) throws IOException {
-        image = ImageIO.read(file.toFile());
-        if (image == null) throw new IOException("그림을 읽을 수 없습니다: " + file);
+        this(read(file), description);
+    }
+    public ImageView(BufferedImage image, String description) {
+        this.image = java.util.Objects.requireNonNull(image);
         setBackground(Theme.WHITE);
         setPreferredSize(new Dimension(600,400));
         setMinimumSize(new Dimension(200,140));
         getAccessibleContext().setAccessibleName(description);
+    }
+    private static BufferedImage read(Path file) throws IOException {
+        BufferedImage image = ImageIO.read(file.toFile());
+        if (image == null) throw new IOException("그림을 읽을 수 없습니다: " + file);
+        return image;
     }
     @Override protected void paintComponent(Graphics graphics) {
         super.paintComponent(graphics);

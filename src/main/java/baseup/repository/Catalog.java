@@ -1,7 +1,7 @@
 package baseup.repository;
 
 import baseup.model.*;
-import baseup.service.Manager;
+import baseup.common.Manager;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -27,8 +27,9 @@ public final class Catalog {
         matchups = new Manager<>(new FileRepository<Matchup>(data.resolve("matchups.tsv"), "id\toffense\tdefense",
                 f -> new Matchup(f[0], teams.find(f[1]).orElseThrow(), teams.find(f[2]).orElseThrow()), x -> "").load());
         rules = new Manager<>(new FileRepository<RuleConcept>(data.resolve("rules.tsv"),
-                "id\ttopic\ttitle\tsummary\tdetail\tsource",
-                f -> new RuleConcept(f[0], f[1], f[2], f[3], f[4], f[5]), x -> "").load());
+                "id\ttopic\ttitle\tsummary\tdetail\tsource\tcategory\tkeywords",
+                f -> new RuleConcept(f[0], f[1], f[2], f[3], f[4], f[5], RuleCategory.fromCode(f[6]),
+                        f[7].isBlank() ? List.of() : List.of(f[7].split("\\|", -1))), x -> "").load());
         questions = new Manager<>(new FileRepository<Question>(data.resolve("questions.tsv"),
                 "id\truleId\ttitle\tlevel\tsituation\tprompt\tchoices\tanswer\tcluePrompt\tclueTarget\thint\texplanation\tmisconception\tbeforeScene\tafterScene",
                 f -> new Question(f[0], f[1], f[2], f[3], f[4], f[5], List.of(f[6].split("\\|", -1)),
@@ -70,6 +71,9 @@ public final class Catalog {
     }
     private void validate() throws IOException {
         if (questions.all().isEmpty() || rules.all().isEmpty()) throw new IOException("규칙과 문제를 하나 이상 등록해 주세요.");
+        for (RuleConcept r : rules.all())
+            if (r.title().isBlank() || r.summary().isBlank() || r.keywords().stream().anyMatch(String::isBlank))
+                throw new IOException("규칙 내용 또는 키워드 누락: " + r.id());
         for (Scene scene : scenes.all()) {
             Set<String> ids = new HashSet<>();
             for (Scene.Token t : scene.tokens())

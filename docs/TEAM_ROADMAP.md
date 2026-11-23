@@ -22,13 +22,13 @@ V1은 합의와 확장의 출발점입니다. 팀원이 코드를 읽지 않은 
 
 | 구역 | 시작할 클래스 | 독립적인 개선 예시 |
 |---|---|---|
-| 통합·앱 시작 | App, MainFrame | 화면 클래스 분리, 경로 설정, 통합 빌드 |
+| 통합·앱 시작 | App, MainFrame, ScreenActions | 화면 연결, 경로 설정, 통합 빌드 |
 | 퀴즈 상태·채점 | QuizSession, Question, QuizPanel | 새로운 미션 단계, 중간 이어하기 |
-| 장면 표현 | Scene, FieldPanel | 좌표 검수, 애니메이션, 클릭 영역 개선 |
-| 콘텐츠·사전 | RuleConcept, Catalog | 규칙 검색 개선, 데이터 검수 도구 |
-| 저장·사용자 | Repository, FileRepository, UserProfile | 마이그레이션, 백업, 프로필 관리 |
-| 복습·성장 | LearningService, StepSelector | 규칙별 복습 간격, 전이 문항 출제 |
-| 메모·사용성 | StudyNote, Theme, 향후 NotesPanel | 메모 수정, 키보드/접근성, UI 시험 |
+| 장면 표현 | SceneQuestionPanel, ImageQuestionPanel, FieldPanel | 좌표 검수, 애니메이션, 클릭 영역 개선 |
+| 콘텐츠·사전 | RuleLibraryPanel, RuleConcept, Catalog | 규칙 검색 개선, 데이터 검수 도구 |
+| 저장·사용자 | UserRepositories, Repository, FileRepository, LearningDialogs | 마이그레이션, 백업, 프로필 관리 |
+| 복습·성장 | ReviewPolicy, LearningProgress, LearningStatistics, StepSelector | 규칙별 복습 간격, 전이 문항 출제, 성장 지표 |
+| 메모·사용성 | NotesPanel, StudyNote, Theme | 메모 수정, 키보드/접근성, UI 시험 |
 
 공유 인터페이스가 바뀌면 미리 예제 호출과 반환값을 합의하세요. 예를 들어 FieldPanel 담당은 “좌표 클릭 시 어떤 tokenId를 전달할지”, 저장 담당은 “save가 실패했을 때 어떤 예외를 줄지”를 정합니다.
 
@@ -36,7 +36,7 @@ V1은 합의와 확장의 출발점입니다. 팀원이 코드를 읽지 않은 
 
 목표는 새 기능을 많이 나열하는 것보다, 팀원 모두가 데이터와 화면을 연결한 코드를 설명할 수 있게 만드는 것입니다.
 
-- MainFrame의 사전/메모/기록 화면을 별도 Panel 클래스로 분리해 병렬 작업 충돌 줄이기.
+- 완료(2026-11-15): MainFrame의 페이지를 전용 Panel로 분리했습니다. 담당 파일은 [ARCHITECTURE.md](ARCHITECTURE.md)를 참고하세요.
 - 프로필 닉네임 수정, 메모 수정, 문항 검수용 미리보기 추가.
 - 기본·응용 외에 처음 보는 전이 문항을 규칙당 1~2개 추가. 목표 24~30문항.
 - 주자 이동을 `javax.swing.Timer`로 표현하되 정지 화면과 텍스트 설명도 제공.

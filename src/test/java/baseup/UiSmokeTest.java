@@ -80,8 +80,9 @@ public final class UiSmokeTest {
             edt(()->{
                 JTextField search=components().stream().filter(JTextField.class::isInstance).map(JTextField.class::cast).findFirst().orElseThrow();
                 search.setText("수비 인원");JList<?> list=components().stream().filter(JList.class::isInstance).map(JList.class::cast).findFirst().orElseThrow();
-                check(list.getModel().getSize()==1,"Discovered image rule searchable");
-                search.setText("no-result-12345");check(list.getModel().getSize()==0,"Empty search");search.setText("");click("북마크에 추가");
+                check(list.getModel().getSize()>=1&&((RuleConcept)list.getModel().getElementAt(0)).id().equals("defense"),"Rule searchable by title");
+                search.setText("보크");check(((RuleConcept)list.getModel().getElementAt(0)).id().equals("balk"),"Undiscovered rule visible in encyclopedia");
+                search.setText("no-result-12345");check(list.getModel().getSize()==0,"Empty search");search.setText("수비 인원");click("북마크에 추가");
             });check(service.bookmarked("defense"),"Image rule bookmark persisted");
             service.addNote("defense","투수와 포수도 수비 인원에 포함된다.");page("notes");snapshot("10-notes");
             for(Question q:service.catalog().questions()) {
@@ -92,12 +93,27 @@ public final class UiSmokeTest {
                     if(!q.hasImage()) {
                         String team=service.catalog().matchup(q.id()).offense().name();
                         check(components().stream().filter(JLabel.class::isInstance).map(JLabel.class::cast).anyMatch(l->team.equals(l.getText())),"KBO badge preserved");
+                        String firstCaption = "<html>" + Theme.html(service.catalog().scene(q.beforeScene()).caption()) + "</html>";
+                        check(components().stream().filter(JLabel.class::isInstance).map(JLabel.class::cast)
+                                .anyMatch(l -> firstCaption.equals(l.getText())), "Scene 1 is shown first: " + q.id());
                     }
                 });
                 if(List.of("Q01","U08","H02").contains(q.id()))snapshot("integrated-"+q.id());
                 if(q.requiresClue()) {
                     edt(()->named("choice-"+q.answer()));edt(()->click("판정 선택 완료 · 단서 찾기   →"));
                     if(List.of("Q01","U08").contains(q.id()))snapshot("clue-"+q.id());
+                    edt(() -> {
+                        Component visual = components().stream()
+                                .filter(q.hasImage() ? ImageView.class::isInstance : FieldPanel.class::isInstance).findFirst().orElseThrow();
+                        for (Question.Clue clue : service.catalog().clues(q)) {
+                            named("clue-" + clue.id());
+                            check(clue.id().equals(session.clue()), "Clue selection changes: " + q.id());
+                            check(components().contains(visual), "Clue selection preserves visual and focus targets: " + q.id());
+                            check(components().stream().filter(JTextArea.class::isInstance).map(JTextArea.class::cast)
+                                    .anyMatch(a -> ("선택한 단서: " + clue.text()).equals(a.getText())), "Selected clue description updates");
+                            checkTextLayout();
+                        }
+                    });
                     edt(()->named("clue-"+q.clueTarget()));edt(()->click("판정과 단서 제출하기   →"));
                 }else answer(session);
                 check(session.results().get(0).independent(),"Correct UI scoring "+q.id());

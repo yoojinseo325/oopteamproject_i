@@ -8,9 +8,16 @@
 
 ### data/rules.tsv
 
-`id, topic, title, summary, detail, source`
+`id, topic, title, summary, detail, source, category, keywords`
 
-34개 규칙·개념을 담습니다. 같은 판단은 기존 ruleId를 재사용하세요. STEP은 data/steps.tsv에서 관리하며 Java의 고정 목록이나 단계 상한을 바꿀 필요가 없습니다. 같은 규칙·같은 문제 유형의 문항은 해당 단계가 열린 뒤 복습 후보가 됩니다.
+40개 규칙·개념을 담습니다.
+
+- `topic`: 퀴즈 주제(`TopicSelector`)와 문제 화면의 머리말. 문제가 없는 규칙도 기존 주제명을 씁니다.
+- `category`: 규칙 백과사전 분류 코드. `basic`(기본 규칙), `batting`(타격 규칙), `running`(주루 규칙), `pitching`(투수 규칙), `umpire`(심판 판정), `record`(기록과 용어) 중 하나. 다른 값이면 시작할 때 오류로 멈춥니다.
+- `keywords`: 검색용 별명·동의어·영어 이름을 `|`로 구분(예: `보크|balk|반칙 투구`). 비워 둘 수 있습니다. 검색은 공백·대소문자·문장부호를 무시하므로 띄어쓰기만 다른 별명은 넣지 않아도 됩니다.
+- 문제와 연결되지 않은 규칙(보크, 견제 등)은 백과사전에서만 보입니다.
+
+ 같은 판단은 기존 ruleId를 재사용하세요. STEP은 data/steps.tsv에서 관리하며 Java의 고정 목록이나 단계 상한을 바꿀 필요가 없습니다. 같은 규칙·같은 문제 유형의 문항은 해당 단계가 열린 뒤 복습 후보가 됩니다.
 
 ### data/questions.tsv
 

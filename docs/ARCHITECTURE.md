@@ -7,15 +7,28 @@
 ```mermaid
 flowchart LR
   App --> MainFrame
+  MainFrame --> Pages[HomePanel / LearningPathPanel / RuleLibraryPanel / RecordsPanel / NotesPanel]
+  MainFrame --> MissionResultPanel
+  MainFrame --> LearningDialogs
   MainFrame --> QuizPanel
-  QuizPanel --> FieldPanel
-  QuizPanel --> ImageView
+  Pages --> ScreenActions
+  QuizPanel --> QuestionVisual
+  QuestionVisual --> ImageQuestionPanel
+  QuestionVisual --> SceneQuestionPanel
+  SceneQuestionPanel --> FieldPanel
+  ImageQuestionPanel --> ImageView
+  QuizPanel --> QuizAnswerPanel
+  QuizPanel --> QuizFeedbackPanel
   MainFrame --> LearningService
   QuizPanel --> LearningService
   LearningService --> Catalog
+  LearningService --> ReviewPolicy
+  LearningService --> LearningProgress
+  LearningService --> LearningStatistics
+  LearningService --> UserRepositories
   LearningService --> Manager
   LearningService --> Repository
-  Repository --> FileRepository
+  FileRepository -.구현.-> Repository
   FileRepository --> TSV[UTF-8 TSV 파일]
 ```
 
@@ -40,14 +53,27 @@ flowchart LR
 | 리스트 | `Manager<T>` | `all`, `find`, `search`, `add`, `remove` |
 | 저장 | `Repository<T>` | 매체와 무관한 `load`, `save` 계약 |
 | 저장 | `FileRepository<T>` | TSV 해독 함수 주입, BufferedReader/Writer, 임시 파일 교체 |
+| 저장 구성 | `UserRepositories` | 5개 사용자 저장소의 계약 묶음, `files(Path)`에서 기존 TSV 파일명·헤더·변환 정의 |
 | 콘텐츠 | `Catalog` | 파일 로딩, 스키마·ID·정답/단서 연결 검사, 규칙 검색 |
-| 처리 | `LearningService` | 제출·저장·단계 완료·자동 재출제·프로필·북마크·메모 진입점 |
-| 출제 | `QuestionSelector` | `select(LearningService)` 계약 |
+| 처리 | `LearningService` | UI의 진입점, 사용자 선택, 입력 검증, 저장 성공 후 상태 변경, 전용 정책 객체 호출 |
+| 복습 | `ReviewPolicy` | 오답·힌트 우선순위, 1/3/7일 간격, 같은 규칙·유형의 대체 문항 선택 |
+| 진도 | `LearningProgress` | 한 사용자의 완료 단계, 화면 순번과 영구 ID, 다음 단계 해제 판단 |
+| 성취 | `LearningStatistics` | 최신 제출 기준 독립 해결, 규칙별 성취, 문항별 최고 XP와 칭호 |
+| 이력 조회 | `LearningHistory` | 저장 순서를 유지하는 사용자 이력 스냅샷, 문항/규칙별 조회; 서비스 패키지 내부 전용 |
+| 출제 조회 | `QuestionSource` | 출제에 필요한 조회 계약. 사용자 전환·채점·저장 변경 메서드는 노출하지 않음 |
+| 출제 | `QuestionSelector` | `select(QuestionSource)` 계약 |
 | 출제 | `StepSelector` | 단계 잠금 검사, 새 상황 사이에 규칙별 재도전 삽입 |
 | 출제 | `TopicSelector` | 기존 주제별 출제 API (기본 UI에서는 미사용) |
 | 출제 | `ReviewSelector` | 기존 문항별 복습 API 유지 (기본 UI에서는 미사용) |
-| 화면 | `MainFrame` | 탐색, CardLayout, 홈/학습 경로/발견한 규칙/기록/메모/결과 화면 |
-| 화면 | `QuizPanel` | 기초는 선택 → 해설, 판정은 선택 → 단서 → 해설 |
+| 창 | `MainFrame` | 공통 탐색·헤더, CardLayout, 진행 중인 미션 수명 관리 |
+| 탐색 계약 | `ScreenActions` | 페이지가 창 구현을 모르고 시작·이동·메모 입력·알림을 요청하는 인터페이스 |
+| 페이지 | `HomePanel`, `LearningPathPanel`, `RuleLibraryPanel`, `RecordsPanel`, `NotesPanel`, `MissionResultPanel` | 각 화면의 구성과 입력 처리 |
+| 공통 화면 | `StatisticsPanel`, `LearningPathView`, `PageComponents` | 성취 요약·단계 목록·제목/문단 표현 재사용 |
+| 대화상자 | `LearningDialogs` | 프로필 선택/추가, 메모 입력 |
+| 퀴즈 조립 | `QuizPanel` | 단계에 맞는 패널 조립, 제출·다음 문제 서비스 호출 |
+| 퀴즈 표현 | `QuestionVisual`, `ImageQuestionPanel`, `SceneQuestionPanel` | 그림/도식의 다형적 표현과 단서 선택 표시 |
+| 퀴즈 입력/해설 | `QuizAnswerPanel`, `QuizFeedbackPanel`, `QuizText` | 답 선택·힌트·근거 안내, 저장된 결과 해설, 긴 본문 높이 계산 |
+| 이미지 재사용 | `QuestionImages` | 현재 문항의 이미지 하나만 보관하여 단계 변경·확대 때 재사용 |
 | 그림 | `ImageView` | V2 PNG 비율 유지·확대 표시 |
 | 그림 | `FieldPanel` | 정답을 모르는 독립적인 야구장 렌더러, 단서 클릭 알림 |
 | 스타일 | `Theme` | 색·글꼴·공통 컴포넌트 |
@@ -78,8 +104,8 @@ FEEDBACK
 
 - **캡슐화:** 화면이 파일이나 내부 ArrayList를 직접 변경하지 않습니다. Manager는 불변 복사본을 반환합니다.
 - **인터페이스와 다형성:** `QuestionSelector` 하나로 StepSelector, TopicSelector, ReviewSelector의 다른 출제 방식을 실행합니다.
-- **의존성 분리:** 파일 처리는 Repository 계약으로 표현합니다. 테스트나 다른 저장 방식으로 교체할 수 있습니다.
-- **책임 분리:** FieldPanel은 그리기만, Question은 정답 판별, QuizSession은 단계, LearningService는 흐름, FileRepository는 파일을 맡습니다.
+- **의존성 분리:** `LearningService(Catalog, UserRepositories, Clock)`에 저장소 계약을 주입합니다. 기존 `Path` 생성자는 편의를 위한 파일 저장소 조립 진입점입니다. 출제는 `QuestionSource`, 페이지 탐색은 `ScreenActions` 계약에 의존합니다.
+- **책임 분리:** FieldPanel은 그리기, Question은 정답 판별, QuizSession은 단계, LearningService는 저장과 흐름 조정, ReviewPolicy는 복습 정책, LearningStatistics는 성취 계산, FileRepository는 파일을 맡습니다.
 - **상속:** MainFrame extends JFrame, QuizPanel/FieldPanel extends JPanel, 공통 패널/버튼의 그리기 메서드 오버라이딩을 실제로 사용합니다.
 - **이벤트 처리:** ActionListener, MouseAdapter, DocumentListener, WindowAdapter를 용도에 맞게 사용합니다.
 
@@ -92,7 +118,26 @@ FEEDBACK
 5. 미션 상태를 바꾸는 기능을 추가하면 단계별 허용 동작을 먼저 합의합니다.
 6. 프로그램 종료 시에는 이미 제출된 문항만 보존됩니다. 이어하기를 추가하려면 별도 세션 저장 모델이 필요합니다.
 
-현재 MainFrame이 여러 페이지를 조립합니다. 후속 개선에서는 HomePanel, RuleLibraryPanel, ProgressPanel, NotesPanel로 추출하면 팀원이 서로 다른 파일에서 작업하기 쉽습니다. 서비스도 기능이 커지면 ProfileService/ProgressService/NoteService로 나누되 먼저 공통 메서드를 합의하세요.
+2026-11-15에 페이지와 학습 정책을 전용 클래스로 분리했습니다. 화면 담당자는 각 Panel에서 작업하고, 복습 담당자는 ReviewPolicy, 진도 담당자는 LearningProgress, 점수 담당자는 LearningStatistics를 수정합니다. 서비스에 모든 규칙을 다시 넣거나 화면에서 저장소를 직접 수정하지 않습니다.
+
+`Manager`는 `baseup.common`으로 이동했습니다. repository가 service를 참조하던 의존 관계가 제거되어 `ui → service → repository`, `service/repository → common → model` 방향을 유지합니다. 화면의 읽기 전용 콘텐츠 조회는 Catalog를 사용합니다. model/common/repository에는 UI 의존성이 없습니다.
+
+진도·통계·복습 객체는 생성 시점의 사용자 기록을 복사한 스냅샷입니다. 저장하거나 사용자를 바꾼 뒤에는 서비스에서 새 스냅샷을 얻습니다. 이전 스냅샷이 다른 사용자의 데이터로 바뀌지 않습니다.
+
+## 퀴즈 화면 갱신
+
+- 문항 시작 시 도식은 장면 1부터 표시합니다. 단서 단계에서도 장면 1의 대상을 선택합니다.
+- JUDGE → CLUE → FEEDBACK 또는 다음 문항으로 바뀔 때 QuizPanel이 영역을 조립합니다.
+- 답/단서를 고를 때는 선택 표시·안내 문구·제출 버튼만 갱신합니다. 이미지/도식과 기존 버튼을 버리지 않으므로 포커스와 스크롤을 유지합니다.
+- 현재 그림은 QuestionImages가 한 장만 보관합니다. 확대와 해설에서도 같은 이미지를 사용하며, 다른 그림 문항으로 바뀌면 교체합니다. 앱 전체 이미지의 무제한 전역 캐시는 만들지 않습니다.
+- 힌트를 열어도 사용 중인 장면이나 단서를 초기화하지 않습니다.
+
+## 검증과 호환성
+
+- 8개 콘텐츠 TSV와 5개 사용자 TSV의 파일명·헤더·ID 의미를 바꾸지 않았습니다. 기존 52문항·26단계·XP·복습 정책을 유지합니다.
+- RepositoryContractTest는 파일 대신 메모리 저장소를 주입하여 제출/단계 완료/프로필/메모/북마크 저장 실패와 재시도, 사용자 격리를 검증합니다.
+- UiSmokeTest는 모든 문항을 실제 Swing 버튼으로 풀고, 장면 1 우선 표시와 단서 변경 후 안내·화면 유지도 검사합니다.
+- build.ps1은 프로젝트의 build/classes만 비운 뒤 컴파일합니다. 패키지를 이동한 이전 클래스가 배포 JAR에 남지 않습니다.
 
 ## 단계와 자동 재도전
 
