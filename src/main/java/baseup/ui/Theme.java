@@ -12,7 +12,24 @@ public final class Theme {
             LINE = new Color(0xDCE5DE), NAVY = new Color(0x132E2B), ORANGE = new Color(0xE8A44F),
             RED = new Color(0xB44E3C);
     private Theme() { }
-    public static Font font(int size, boolean bold) { return new Font("Malgun Gothic", bold ? Font.BOLD : Font.PLAIN, size); }
+    /** data/fonts 폴더에 KBO 다이아고딕(.ttf/.otf)이 있으면 그 글꼴을, 없으면 맑은 고딕을 쓴다. */
+    private static final Font KBO_BOLD = loadFont("bold"), KBO_TEXT = loadFont("light") != null ? loadFont("light") : loadFont("medium");
+    private static Font loadFont(String weight) {
+        java.io.File[] files = new java.io.File("data/fonts").listFiles();
+        if (files == null) return null;
+        for (java.io.File f : files) {
+            String name = f.getName().toLowerCase(java.util.Locale.ROOT);
+            if (name.contains(weight) && (name.endsWith(".ttf") || name.endsWith(".otf"))) {
+                try { return Font.createFont(Font.TRUETYPE_FONT, f); } catch (Exception ignored) { }
+            }
+        }
+        return null;
+    }
+    public static Font font(int size, boolean bold) {
+        Font kbo = bold ? KBO_BOLD : KBO_TEXT;
+        if (kbo != null) return kbo.deriveFont((float) size);
+        return new Font("Malgun Gothic", bold ? Font.BOLD : Font.PLAIN, size);
+    }
     public static Color contrast(Color background) {
         double[] channels = {background.getRed()/255.0, background.getGreen()/255.0, background.getBlue()/255.0};
         for (int i=0;i<3;i++) channels[i]=channels[i]<=0.04045?channels[i]/12.92:Math.pow((channels[i]+0.055)/1.055,2.4);

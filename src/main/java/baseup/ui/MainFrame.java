@@ -13,7 +13,11 @@ import java.util.*;
 import java.util.List;
 import static baseup.ui.Theme.*;
 
-/** 탐색과 화면 조립만 담당한다. 데이터 변경은 LearningService에 위임한다. */
+/**
+ * 창 틀(사이드바·위쪽 막대·아래 상태줄)과 페이지 이동, 퀴즈 진행만 담당한다.
+ * 각 페이지 화면은 Screen을 상속한 클래스(HomeScreen, StudyScreen, QuizScreen, MyPageScreen …)가 만든다.
+ * 데이터 변경은 LearningService에 위임한다.
+ */
 public final class MainFrame extends JFrame {
     private final LearningService service;
     private final CardLayout cards = new CardLayout();
@@ -22,8 +26,18 @@ public final class MainFrame extends JFrame {
     private final JLabel location = label("학습 홈", 15, INK, true);
     private final JLabel xp = label("", 13, GREEN, true);
     private final JLabel status = label("학습 준비 완료 · 기록은 이 컴퓨터에 저장됩니다", 12, MUTED, false);
-    private final JButton profile = button("", false, this::profilesDialog);
-    private QuizSession session;
+    private final JButton profile = button("로그인", false, () -> this.loginAction.run());
+    /** 로그인 버튼이 눌렸을 때 할 일. 로그인 페이지 담당 팀원이 setLoginAction(...)으로 연결한다. */
+    private Runnable loginAction = () -> message("로그인 페이지는 준비 중이에요.");
+    public void setLoginAction(Runnable action) { loginAction = action; }
+    LearningService service() { return service; }
+    // 메인 화면은 메뉴를 오갈 때마다 새로 만들어지므로, 이어져야 하는 것은 여기(창)에 보관한다
+    private final baseup.game.GameState gameState = new baseup.game.GameState();   // 타격 게임 경기 기록
+    private int todaySlide;                                                         // 오늘의 규칙 슬라이드 위치
+    baseup.game.GameState gameState() { return gameState; }
+    int todaySlide() { return todaySlide; }
+    void setTodaySlide(int index) { todaySlide = index; }
+    QuizSession session;
     private String currentPage = "home";
 
     public MainFrame(LearningService service) {
@@ -32,9 +46,10 @@ public final class MainFrame extends JFrame {
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosing(java.awt.event.WindowEvent e) { if (leaveQuiz()) { dispose(); System.exit(0); } }
         });
-        setLayout(new BorderLayout()); super.add(sidebar(),BorderLayout.WEST);
+        setLayout(new BorderLayout()); side=sidebar(); super.add(side,BorderLayout.WEST);
         JPanel main=new JPanel(new BorderLayout()); main.setBackground(BG);
-        JPanel top=new JPanel(new BorderLayout()); top.setBackground(WHITE); top.setBorder(new EmptyBorder(18,30,18,30));
+        JPanel top=new JPanel(new BorderLayout()); top.setBackground(Ballpark.BOARD); top.setBorder(new EmptyBorder(16,30,16,30));
+        location.setForeground(WHITE); xp.setForeground(Ballpark.LAMP);
         top.add(location,BorderLayout.WEST); top.add(xp,BorderLayout.EAST); main.add(top,BorderLayout.NORTH);
         main.add(workspace,BorderLayout.CENTER);
         JPanel footer=new JPanel(new BorderLayout()); footer.setBackground(BG); footer.setBorder(new EmptyBorder(9,30,12,30));
@@ -44,131 +59,148 @@ public final class MainFrame extends JFrame {
         Dimension screen=Toolkit.getDefaultToolkit().getScreenSize();
         setSize(Math.min(1360,screen.width-70),Math.min(940,screen.height-70));
         setLocationRelativeTo(null); showPage("home");
+        showIntro();
     }
+    /**
+     * 프로그램을 처음 켰을 때 16초 인트로(IntroAnimation)를 창 전체 위(글래스 패인)에 띄운다.
+     * 끝나거나 클릭·키 입력으로 건너뛰면 인트로가 0.5초 동안 투명해지며 메인 화면이 드러난다.
+     * 끄려면 -Dbaseup.intro=off 로 실행한다. 화면이 없는 테스트 환경에서는 띄우지 않는다.
+     */
+    private void showIntro() {
+        if (GraphicsEnvironment.isHeadless() || "off".equals(System.getProperty("baseup.intro"))) return;
+        IntroAnimation intro = new IntroAnimation(() -> getGlassPane().setVisible(false));
+        setGlassPane(intro);
+        intro.setVisible(true);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowOpened(java.awt.event.WindowEvent e) { intro.start(); }
+        });
+    }
+    private JPanel side;
+    /** 왼쪽 사이드바: 응원팀을 고르면 배경·띠·카드가 그 팀 색으로 바뀐다. */
     private JPanel sidebar() {
-        JPanel side=new JPanel(new BorderLayout()); side.setBackground(NAVY); side.setPreferredSize(new Dimension(210,700));
-        side.setBorder(new EmptyBorder(30,20,24,20));
+        Team team=favoriteTeam();
+        Sidebar.Background panel=new Sidebar.Background(team==null?null:new Color(team.color()),team==null?null:new Color(team.accent()));
+        panel.setPreferredSize(new Dimension(236,700)); panel.setBorder(new EmptyBorder(24,16,20,16));
         JPanel body=column();
-        Theme.add(body,label("BASEUP",29,WHITE,true)); gap(body,4);
-        Theme.add(body,label("야구를 읽는 첫걸음",12,new Color(0x9EB8AE),false)); gap(body,42);
-        Theme.add(body,label("MY CLUBHOUSE",10,new Color(0x7F9B91),true)); gap(body,14);
-        String[][] menus={{"home","01   학습 홈"},{"missions","02   나의 학습 경로"},{"library","03   발견한 규칙"},
-                {"records","04   나의 성장"},{"notes","05   나의 메모"}};
-        for(String[] menu:menus) {
-            JButton b=new JButton(menu[1]); b.setFont(font(14,true)); b.setHorizontalAlignment(SwingConstants.LEFT);
-            b.setForeground(new Color(0xBDCDC6)); b.setBackground(NAVY); b.setOpaque(true);
-            b.setBorder(new EmptyBorder(14,14,14,8)); b.setFocusPainted(true);
-            b.setMaximumSize(new Dimension(Integer.MAX_VALUE,49)); b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            b.addActionListener(e -> navigate(menu[0])); navigation.put(menu[0],b); Theme.add(body,b); gap(body,5);
+        Theme.add(body,new Sidebar.Emblem()); gap(body,20);
+        RoundedPanel teamCard=new RoundedPanel(new Color(0,0,0,70),16);teamCard.setBorder(new EmptyBorder(12,12,12,12));teamCard.setLayout(new BorderLayout(12,0));
+        if(team!=null) {
+            teamCard.add(new Ballpark.ImageSlot("logos",team.id(),"LOGO",64,64),BorderLayout.WEST);
+            JPanel who=column();Theme.add(who,label("MY TEAM",10,new Color(255,255,255,200),true));gap(who,3);Theme.add(who,label(team.name(),15,WHITE,true));gap(who,6);
+            JButton change=button("팀 바꾸기",false,this::pickTeam);change.setFont(Theme.font(11,true));change.setBorder(new EmptyBorder(5,10,5,10));Theme.add(who,change);
+            teamCard.add(who,BorderLayout.CENTER);
+            teamCard.add(nextGameLine(team),BorderLayout.SOUTH);
+        } else {
+            JPanel who=column();Theme.add(who,label("MY TEAM",10,new Color(0x9FB0C6),true));gap(who,6);
+            Theme.add(who,label("응원팀을 골라 보세요",13,WHITE,true));gap(who,8);
+            Theme.add(who,button("응원팀 고르기",false,this::pickTeam));teamCard.add(who,BorderLayout.CENTER);
         }
-        side.add(body,BorderLayout.NORTH);
-        JPanel bottom=column();
-        Theme.add(bottom,label("서두르지 않아도 괜찮아요.",12,new Color(0xB9CBC2),false)); gap(bottom,5);
-        Theme.add(bottom,label("한 번의 판정이, 하나의 배움.",12,new Color(0xB9CBC2),false)); gap(bottom,22);
-        profile.setMaximumSize(new Dimension(Integer.MAX_VALUE,48)); Theme.add(bottom,profile); side.add(bottom,BorderLayout.SOUTH);
-        return side;
+        teamCard.setMaximumSize(new Dimension(Integer.MAX_VALUE,teamCard.getPreferredSize().height));Theme.add(body,teamCard);gap(body,22);
+        Theme.add(body,label("   MY CLUBHOUSE",11,new Color(255,255,255,190),true)); gap(body,8);
+        String[][] menus={{"home","메인 홈","home"},{"missions","규칙 학습","mitt"},{"quiz","퀴즈","camera"},
+                {"mypage","마이페이지","person"}};
+        navigation.clear();
+        for(String[] menu:menus) {
+            Sidebar.NavButton b=new Sidebar.NavButton(menu[1],menu[2]);
+            b.addActionListener(e -> navigate(menu[0])); navigation.put(menu[0],b); Theme.add(body,b); gap(body,2);
+        }
+        panel.add(body,BorderLayout.NORTH);
+        // 마스코트 자리: data/mascots/팀ID.png 를 넣으면 사이드바 아래쪽에 크게 뜬다
+        JPanel mascot=new JPanel(new GridBagLayout());mascot.setOpaque(false);
+        if(team!=null){
+            JPanel stack=column();
+            Ballpark.ImageSlot slot=new Ballpark.ImageSlot("mascots",team.id(),"MASCOT",190,230);slot.setAlignmentX(.5f);stack.add(slot);
+            JLabel name=label(team.name(),22,WHITE,true);name.setFont(name.getFont().deriveFont(Font.BOLD|Font.ITALIC));name.setAlignmentX(.5f);
+            stack.add(Box.createVerticalStrut(8));stack.add(name);
+            GridBagConstraints c=new GridBagConstraints();c.anchor=GridBagConstraints.SOUTH;c.weighty=1;mascot.add(stack,c);
+        }
+        panel.add(mascot,BorderLayout.CENTER);
+        JPanel bottom=column(); gap(bottom,10);
+        profile.setMaximumSize(new Dimension(Integer.MAX_VALUE,46)); Theme.add(bottom,profile); panel.add(bottom,BorderLayout.SOUTH);
+        return panel;
     }
-    private void navigate(String page) { if (leaveQuiz()) { session=null; showPage(page); } }
-    private boolean leaveQuiz() {
+    /** 사이드바 팀 카드 아래: 다음 경기 + 최근 결과 한 줄 (data/games.tsv). */
+    private JComponent nextGameLine(Team team) {
+        JPanel box=column(); box.setBorder(new EmptyBorder(10,0,0,0));
+        try {
+            List<GameResult> mine=new ArrayList<>(TeamSchedule.games().stream().filter(g->g.involves(team.id())).toList());
+            mine.sort(Comparator.comparing(GameResult::date).thenComparing(GameResult::time));
+            GameResult next=mine.stream().filter(g->!g.played()).findFirst().orElse(null);
+            List<GameResult> done=mine.stream().filter(GameResult::played).toList();
+            Theme.add(box,label("나의 다음 일정",10,new Color(255,255,255,200),true));gap(box,3);
+            Theme.add(box,label(next==null?"예정된 경기 없음":TeamSchedule.shortDate(next.date())+" "+next.time()+"  vs "+TeamSchedule.teamName(service,next.opponent(team.id())),12,WHITE,true));
+            if(!done.isEmpty()){
+                StringBuilder recent=new StringBuilder("최근  ");
+                for(int i=done.size()-1;i>=Math.max(0,done.size()-2);i--){GameResult g=done.get(i);int me=g.myScore(team.id()),them=g.theirScore(team.id());
+                    recent.append(me>them?"승 ":me<them?"패 ":"무 ").append(me).append(":").append(them).append("   ");}
+                gap(box,3);Theme.add(box,label(recent.toString().strip(),12,Ballpark.LAMP,true));
+            }
+        } catch(java.io.IOException e) { Theme.add(box,label("games.tsv 확인 필요",11,WHITE,false)); }
+        return box;
+    }
+    /** 응원팀이 바뀌면 사이드바를 새로 만들어 끼운다. */
+    private void rebuildSidebar() {
+        getContentPane().remove(side); side=sidebar(); super.add(side,BorderLayout.WEST);
+        getContentPane().revalidate(); getContentPane().repaint();
+    }
+    void navigate(String page) { if (leaveQuiz()) { session=null; showPage(page); } }
+    boolean leaveQuiz() {
         if (session==null || session.stage()==QuizSession.Stage.COMPLETE) return true;
         return JOptionPane.showConfirmDialog(this,"미션을 나갈까요?\n이미 제출한 판정은 저장됩니다. 아직 제출하지 않은 선택은 저장되지 않습니다.\n완료하지 않은 단계는 처음부터 다시 시작해요.",
                 "미션 나가기",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION;
     }
     private void refreshHeader() {
-        xp.setText(service.rank()+"   /   "+service.xp()+" XP"); profile.setText(service.user().nickname()+"  · 변경");
+        xp.setText(service.rank()+"   /   "+service.xp()+" XP"); profile.setText("로그인");
     }
-    private void showPage(String page) {
+    void showPage(String page) {
         currentPage=page; refreshHeader();
         for(var entry:navigation.entrySet()) {
-            entry.getValue().setBackground(entry.getKey().equals(page)?new Color(0x285044):NAVY);
-            entry.getValue().setForeground(entry.getKey().equals(page)?WHITE:new Color(0xBDCDC6));
+            ((Sidebar.NavButton)entry.getValue()).active(entry.getKey().equals(navKey(page)));
         }
         JComponent content=switch(page) {
-            case "missions" -> missions(); case "library" -> library(); 
-            case "records" -> records(); case "notes" -> notes(); default -> home();
+            case "missions" -> new StudyScreen(this).build(); case "quiz" -> new QuizScreen(this).build();
+            case "mypage", "records", "library", "notes" -> new MyPageScreen(this, page).build(); default -> new HomeScreen(this).build();
         };
-        location.setText(switch(page) {case "missions"->"나의 학습 경로";case "library"->"발견한 규칙";case "records"->"나의 성장";case "notes"->"나의 메모";default->"학습 홈";});
+        location.setText(switch(navKey(page)) {case "missions"->"규칙 학습";case "quiz"->"퀴즈";case "mypage"->"마이페이지";default->"학습 홈";});
         workspace.removeAll(); workspace.add(content,page); cards.show(workspace,page); workspace.revalidate(); workspace.repaint();
     }
-    private JPanel page(String kicker,String title,String subtitle) {
-        JPanel p=column(); p.setBorder(new EmptyBorder(28,30,28,30));
-        Theme.add(p,label(kicker,11,GREEN,true));gap(p,9);Theme.add(p,label(title,29,INK,true));gap(p,9);
-        Theme.add(p,label(subtitle,14,MUTED,false));gap(p,24);return p;
-    }
-    private JTextArea paragraph(String value,int rows) { JTextArea a=text(value,14,MUTED);a.setRows(rows);return a; }
-    private String nextAction() { return service.courseComplete() ? "새로운 조합으로 도전   →" : "STEP " + service.nextStepNumber() + " 시작하기   →"; }
-    private void startNext() {
+    String nextAction() { return service.courseComplete() ? "새로운 조합으로 도전   →" : "STEP " + service.nextStepNumber() + " 시작하기   →"; }
+    void startNext() {
         try { showQuiz(service.startNext(), service.courseComplete()?"계속 도전":"STEP "+service.nextStepNumber()); }
         catch(Exception e) { error(e); }
     }
-    private JComponent home() {
-        boolean done=service.courseComplete(); int current=service.nextStepNumber();
-        JPanel p=page("YOUR NEXT BASE", "다음 판정은, 시작하면 펼쳐져요.", service.user().nickname()+"님, 한 단계씩 나만의 심판 감각을 키워 보세요.");
-        RoundedPanel hero=new RoundedPanel(PALE,22); hero.setLayout(new BorderLayout(20,0));
-        JPanel left=column(); Theme.add(left,label(done?"ALL BASES CLEAR":"NOW PLAYING   /   STEP "+current,11,GREEN,true));gap(left,14);
-        Theme.add(left,label(done?"모든 단계를 완주했어요!":service.step(current).goal(),25,INK,true));gap(left,12);
-        Theme.add(left,paragraph(done?"익숙한 규칙도 다른 조건에서는 새로운 도전이 됩니다.\n지금 필요한 판단을 섞어서 다시 만나 보세요.":"어떤 상황이 기다릴지는 아직 비밀이에요.\n장면을 만나고, 판단하고, 해설을 확인하며 앞으로 나아가요.",3));gap(left,14);
-        Theme.add(left,button(nextAction(),true,this::startNext));gap(left,12);
-        Theme.add(left,label("한 번에 2~4개 상황  ·  시간제한 없음  ·  실수해도 다음 단계로",12,MUTED,false));
-        hero.add(left,BorderLayout.CENTER);hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,285));Theme.add(p,hero);gap(p,18);
-        Theme.add(p,stats());gap(p,24);
-        Theme.add(p,label("나의 학습 경로",19,INK,true));gap(p,8);
-        Theme.add(p,label("지금의 한 단계에 집중해요. 다음 내용은 도착했을 때 열립니다.",13,MUTED,false));gap(p,16);
-        Theme.add(p,missionCards());gap(p,18);
-        Theme.add(p,paragraph("따로 오답을 정리하지 않아도 괜찮아요. 헷갈렸던 판단은 다음 단계의 다른 상황 속에서 다시 연습해요.",2));
-        return scroll(p);
+    String pendingRule; RuleSearchBox homeSearch;
+    /** 응원팀. 지금은 이 실행 동안만 기억한다(저장은 백엔드 UserProfile에 칸이 생기면 연결). */
+    private Team favoriteTeam;
+    Team favoriteTeam() {
+        if (favoriteTeam == null && System.getProperty("baseup.team") != null)
+            favoriteTeam = service.catalog().teams().stream().filter(t -> t.id().equals(System.getProperty("baseup.team"))).findFirst().orElse(null);
+        return favoriteTeam;
     }
-    private JPanel stats() {
-        JPanel row=new JPanel(new GridLayout(1,3,15,0)); row.setOpaque(false);
-        row.add(stat("완료한 단계",service.completedSteps()+" / "+service.steps().size(),"한 단계씩 열리는 나의 경로"));
-        row.add(stat("스스로 해결한 상황",service.solvedCount()+"개","답과 필요한 단서 정답 · 힌트 없이"));
-        row.add(stat("차곡차곡 쌓인 경험",service.xp()+" XP",service.rank()));
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE,125));return row;
+    /** 메인 검색에서 고른 규칙을 '발견한 규칙' 화면에서 선택된 상태로 연다. */
+    void openRule(String ruleId) { pendingRule=ruleId; showPage("library"); }
+    private void pickTeam() {
+        List<Team> teams=service.catalog().teams();
+        String[] names=teams.stream().map(Team::name).toArray(String[]::new);
+        Object chosen=JOptionPane.showInputDialog(this,"어느 팀을 응원하세요?","응원팀 고르기",JOptionPane.PLAIN_MESSAGE,null,
+                names,favoriteTeam()==null?names[0]:favoriteTeam().name());
+        for(Team t:teams) if(t.name().equals(chosen)){favoriteTeam=t;rebuildSidebar();showPage("home");}
     }
-    private JPanel stat(String caption,String number,String sub) {
-        RoundedPanel card=card();card.setLayout(new BorderLayout(0,9));card.add(label(caption,12,MUTED,false),BorderLayout.NORTH);
-        card.add(label(number,28,INK,true),BorderLayout.CENTER);card.add(label(sub,11,MUTED,false),BorderLayout.SOUTH);return card;
-    }
-    private JPanel missionCards() {
-        JPanel path=column();
-        for(LearningStep step:service.steps()) {
-            boolean done=service.stepCompleted(step.number()), unlocked=service.stepUnlocked(step.number());
-            RoundedPanel item=new RoundedPanel(done?WHITE:unlocked?PALE:new Color(0xECEFEB),18);
-            item.setLayout(new BorderLayout(18,0));item.setBorder(new EmptyBorder(17,20,17,20));
-            RoundedPanel badge=new RoundedPanel(done?GREEN:unlocked?WHITE:LINE,48);badge.setBorder(new EmptyBorder(0,0,0,0));badge.setLayout(new BorderLayout());
-            JLabel node=label(unlocked?String.valueOf(step.number()):"?",24,done?WHITE:unlocked?GREEN:MUTED,true);
-            node.setHorizontalAlignment(SwingConstants.CENTER);badge.add(node);badge.setPreferredSize(new Dimension(48,48));item.add(badge,BorderLayout.WEST);
-            JPanel info=column();Theme.add(info,label("STEP "+step.number()+"  /  "+(done?"완료":unlocked?"지금 도전":"아직 열리지 않은 단계"),11,unlocked?GREEN:MUTED,true));gap(info,6);
-            Theme.add(info,label(unlocked?step.goal():"어떤 판정이 기다리고 있을까요?",16,unlocked?INK:MUTED,true));
-            item.add(info,BorderLayout.CENTER);
-            JButton action=button(done?"다시 도전":unlocked?"시작하기   →":"잠김",unlocked&&!done,()->{
-                try { showQuiz(service.startStep(step.number()),"STEP "+step.number()); } catch(Exception e) { error(e); }
-            });action.setEnabled(unlocked);item.add(action,BorderLayout.EAST);
-            item.setMaximumSize(new Dimension(Integer.MAX_VALUE,92));Theme.add(path,item);
-            if(step.number()<service.steps().size()){gap(path,3);Theme.add(path,label("       │",14,LINE,true));gap(path,3);}
-        }
-        return path;
-    }
-    private JComponent missions() {
-        JPanel p=page("YOUR LEARNING PATH","한 단계씩, 다음 베이스로.","새로운 상황 사이에 이전 판단이 다시 등장해요. 실수는 다음 도전을 준비하는 단서입니다.");
-        if(service.courseComplete()){Theme.add(p,button(nextAction(),true,this::startNext));gap(p,20);}
-        Theme.add(p,missionCards());return scroll(p);
-    }
-    private void showQuiz(QuizSession next,String title) {
+    void showQuiz(QuizSession next,String title) {
         session=next;location.setText("심판 미션  /  "+title);
-        navigation.values().forEach(b->b.setBackground(NAVY));
+        navigation.values().forEach(b->((Sidebar.NavButton)b).active(false));
         QuizPanel quiz=new QuizPanel(service,session,this::completed,()->{if(leaveQuiz()){session=null;showPage("missions");}},this::message,this::error);
         workspace.removeAll();workspace.add(quiz,"quiz");cards.show(workspace,"quiz");workspace.revalidate();workspace.repaint();
     }
     private void completed() {
         refreshHeader();int correct=(int)session.results().stream().filter(Attempt::understood).count();
         int independent=(int)session.results().stream().filter(Attempt::independent).count();
-        JPanel p=page("MISSION COMPLETE","판정 하나만큼, 성장했어요.",session.stepNumber()>0?"STEP "+session.stepNumber()+" 완료 · "+(service.courseComplete()?"모든 단계를 완주했어요!":"다음 단계가 열렸어요."):"새로운 상황에서도 판단의 기준을 떠올려 보세요.");
+        JPanel p=Screen.page("MISSION COMPLETE","판정 하나만큼, 성장했어요.",session.stepNumber()>0?"STEP "+session.stepNumber()+" 완료 · "+(service.courseComplete()?"모든 단계를 완주했어요!":"다음 단계가 열렸어요."):"새로운 상황에서도 판단의 기준을 떠올려 보세요.");
         RoundedPanel result=card();result.setLayout(new BorderLayout(20,10));
         JPanel words=column();Theme.add(words,label(independent==session.size()?"NICE CALL!":"GOOD PRACTICE!",34,GREEN,true));gap(words,16);
         Theme.add(words,label("이해한 문제   "+correct+" / "+session.size(),22,INK,true));gap(words,12);
         Theme.add(words,label("힌트 없이 해결한 상황   "+independent+"개",15,MUTED,false));gap(words,12);
-        Theme.add(words,paragraph("헷갈렸던 판단은 다음 도전의 다른 상황 속에서 다시 만나요.\n익숙해진 판단은 간격을 두고 돌아옵니다. 따로 정리할 숙제는 없어요.",2));
+        Theme.add(words,Screen.paragraph("헷갈렸던 판단은 다음 도전의 다른 상황 속에서 다시 만나요.\n익숙해진 판단은 간격을 두고 돌아옵니다. 따로 정리할 숙제는 없어요.",2));
         result.add(words,BorderLayout.CENTER);Theme.add(p,result);gap(p,20);
         for(Attempt a:session.results()) {
             Question q=service.catalog().question(a.questionId()).orElseThrow();
@@ -181,100 +213,10 @@ public final class MainFrame extends JFrame {
         workspace.removeAll();workspace.add(scroll(p),"result");cards.show(workspace,"result");workspace.revalidate();workspace.repaint();
         message("미션 완료 · 모든 제출 기록을 저장했습니다.");
     }
-    private JComponent library() {
-        JPanel outer=new JPanel(new BorderLayout(0,20));outer.setOpaque(false);outer.setBorder(new EmptyBorder(28,30,28,30));
-        JPanel top=column();Theme.add(top,label("RULEBOOK",11,GREEN,true));gap(top,8);
-        Theme.add(top,label("플레이하며 발견한 규칙.",28,INK,true));gap(top,18);
-        JPanel filters=new JPanel(new BorderLayout(12,0));filters.setOpaque(false);
-        JTextField search=input("규칙 이름이나 설명 검색");filters.add(search,BorderLayout.CENTER);
-        JCheckBox only=new JCheckBox("북마크만");only.setOpaque(false);filters.add(only,BorderLayout.EAST);Theme.add(top,filters);
-        outer.add(top,BorderLayout.NORTH);
-        DefaultListModel<RuleConcept> model=new DefaultListModel<>();JList<RuleConcept> list=new JList<>(model);
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);list.setFixedCellHeight(78);
-        list.setBackground(WHITE);list.setSelectionBackground(PALE);list.setSelectionForeground(INK);
-        list.setCellRenderer((items,value,index,selected,focus)->{
-            JLabel l=new JLabel("<html><b>"+html(value.title())+"</b><br><font color='#697975'>"+html(value.topic())+"</font></html>");
-            l.setOpaque(true);l.setBackground(selected?PALE:WHITE);l.setForeground(INK);l.setBorder(new EmptyBorder(12,17,12,14));return l;
-        });
-        JScrollPane index=scroll(list);index.setPreferredSize(new Dimension(235,500));
-        JPanel detail=new JPanel(new BorderLayout());detail.setOpaque(false);
-        JPanel body=new JPanel(new BorderLayout(20,0));body.setOpaque(false);body.add(index,BorderLayout.WEST);body.add(detail,BorderLayout.CENTER);outer.add(body,BorderLayout.CENTER);
-        Runnable render=()->{
-            detail.removeAll();RuleConcept r=list.getSelectedValue();
-            if(r==null) detail.add(label("<html>아직 발견한 규칙이 없거나 검색 결과가 없어요.<br>단계에서 판정을 제출하면 이곳에 규칙이 열립니다.</html>",14,MUTED,false));
-            else {
-                RoundedPanel card=card();card.setLayout(new BorderLayout(0,18));JPanel info=column();
-                Theme.add(info,label(r.topic()+"  /  RULE CARD",11,GREEN,true));gap(info,16);Theme.add(info,label(r.title(),28,INK,true));gap(info,14);
-                JTextArea summary=paragraph(r.summary(),2);summary.setForeground(GREEN);Theme.add(info,summary);gap(info,14);
-                Theme.add(info,paragraph(r.detail(),7));gap(info,18);
-                Theme.add(info,label("독립 해결   "+service.mastery(r.id())+" / "+service.questionCount(r.id())+" 상황",13,GREEN,true));gap(info,16);
-                Theme.add(info,paragraph("확인 출처: "+r.source()+"\n학습을 위해 단순화한 상황입니다.",3));
-                card.add(info,BorderLayout.CENTER);
-                JPanel actions=new JPanel(new GridLayout(0,1,0,10));actions.setOpaque(false);
-                actions.add(button(service.bookmarked(r.id())?"북마크 해제":"북마크에 추가",false,()->{
-                    try{service.toggleBookmark(r.id());message("북마크를 저장했습니다.");showPage("library");}catch(Exception e){error(e);}
-                }));
-                actions.add(button("내 말로 메모하기",false,()->noteDialog(r)));card.add(actions,BorderLayout.SOUTH);detail.add(scroll(card));
-            }
-            detail.revalidate();detail.repaint();
-        };
-        Runnable filter=()->{model.clear();service.catalog().searchRules(search.getText()).stream().filter(r->service.discovered(r.id())).filter(r->!only.isSelected()||service.bookmarked(r.id())).forEach(model::addElement);if(!model.isEmpty())list.setSelectedIndex(0);render.run();};
-        listen(search,filter);only.addActionListener(e->filter.run());list.addListSelectionListener(e->{if(!e.getValueIsAdjusting())render.run();});filter.run();
-        return outer;
+    private static String navKey(String page) {
+        return switch (page) { case "records", "library", "notes" -> "mypage"; default -> page; };
     }
-    private JComponent records() {
-        JPanel p=page("MY SCOREBOOK","결과보다, 이해의 깊이.","제출한 판정과 단서, 힌트 사용 기록이 사용자별로 남습니다.");Theme.add(p,stats());gap(p,24);
-        Theme.add(p,label("규칙별 독립 해결",19,INK,true));gap(p,16);
-        JPanel rules=new JPanel(new GridLayout(0,3,12,12));rules.setOpaque(false);
-        for(RuleConcept r:service.catalog().rules().stream().filter(r->service.discovered(r.id())).toList()) {
-            RoundedPanel c=card();c.setLayout(new BorderLayout(0,12));c.add(label(r.title(),14,INK,true),BorderLayout.NORTH);
-            JProgressBar bar=new JProgressBar(0,(int)service.questionCount(r.id()));bar.setValue(service.mastery(r.id()));
-            bar.setForeground(GREEN);bar.setBackground(PALE);bar.setBorderPainted(false);bar.setStringPainted(true);bar.setString(service.mastery(r.id())+" / "+service.questionCount(r.id()));c.add(bar);rules.add(c);
-        }Theme.add(p,rules);gap(p,24);Theme.add(p,label("최근 제출 기록",19,INK,true));gap(p,14);
-        DefaultTableModel model=new DefaultTableModel(new String[]{"풀이 시각","상황","판정","단서","힌트","시간"},0){@Override public boolean isCellEditable(int r,int c){return false;}};
-        List<Attempt> history=new ArrayList<>(service.attempts());Collections.reverse(history);
-        DateTimeFormatter date=DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.systemDefault());
-        for(Attempt a:history) model.addRow(new Object[]{date.format(a.at()),service.catalog().question(a.questionId()).map(Question::title).orElse("삭제된 문항 "+a.questionId()),
-                a.answerCorrect()?"정답":"다시 보기",a.clueRequired()?(a.clueCorrect()?"정답":"다시 보기"):"해당 없음",a.hintUsed()?"사용":"없음",a.seconds()+"초"});
-        JTable table=new JTable(model);table.setRowHeight(36);table.setShowGrid(false);table.setIntercellSpacing(new Dimension(0,0));
-        table.getTableHeader().setFont(font(12,true));table.getTableHeader().setBackground(PALE);table.setFillsViewportHeight(true);
-        table.getColumnModel().getColumn(1).setPreferredWidth(230);table.setAutoCreateRowSorter(true);
-        JScrollPane scroll=scroll(table);scroll.setPreferredSize(new Dimension(850,260));Theme.add(p,scroll);
-        if(history.isEmpty()){gap(p,12);Theme.add(p,label("아직 제출 기록이 없습니다. 첫 미션에 도전해 보세요.",13,MUTED,false));}
-        return scroll(p);
-    }
-    private JComponent notes() {
-        JPanel p=page("MY FIELD NOTES","내 말로 남기는 규칙.","원할 때만 남기는 개인 메모예요. 다음 단계로 가기 위해 작성할 필요는 없어요.");
-        JPanel controls=new JPanel(new BorderLayout(12,0));controls.setOpaque(false);JTextField search=input("메모 내용이나 규칙 이름 검색");
-        controls.setMaximumSize(new Dimension(Integer.MAX_VALUE,48));
-        controls.add(search,BorderLayout.CENTER);controls.add(button("+ 메모 추가",true,()->noteDialog(null)),BorderLayout.EAST);Theme.add(p,controls);gap(p,20);
-        JPanel results=column();Theme.add(p,results);
-        Runnable refresh=()->{
-            results.removeAll();List<StudyNote> list=service.notes(search.getText());
-            if(list.isEmpty())Theme.add(results,label("메모가 없습니다. 기억하고 싶은 규칙을 내 말로 적어보세요.",14,MUTED,false));
-            for(StudyNote note:list) {
-                RoundedPanel c=card();c.setLayout(new BorderLayout(20,12));c.add(label(service.catalog().rule(note.ruleId()).title(),15,GREEN,true),BorderLayout.NORTH);
-                JTextArea body=paragraph(note.text(),Math.min(15,Math.max(2,(note.text().length()+49)/50+note.text().split("\n").length)));
-                c.add(body,BorderLayout.CENTER);c.add(button("삭제",false,()->{
-                    if(JOptionPane.showConfirmDialog(this,"이 메모를 삭제할까요?","메모 삭제",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION)
-                        try{service.deleteNote(note.id());message("메모를 삭제했습니다.");showPage("notes");}catch(Exception e){error(e);}
-                }),BorderLayout.EAST);Theme.add(results,c);gap(results,12);
-            }results.revalidate();results.repaint();
-        };listen(search,refresh);refresh.run();return scroll(p);
-    }
-    private void noteDialog(RuleConcept initial) {
-        List<RuleConcept> discovered=service.catalog().rules().stream().filter(r->service.discovered(r.id())).toList();
-        if(discovered.isEmpty()){message("먼저 첫 단계에 도전해 규칙을 발견해 보세요.");return;}
-        JComboBox<RuleConcept> rule=new JComboBox<>(discovered.toArray(RuleConcept[]::new));if(initial!=null)rule.setSelectedItem(initial);
-        JTextArea body=new JTextArea(7,36);body.setLineWrap(true);body.setWrapStyleWord(true);body.setFont(font(14,false));
-        JPanel form=new JPanel(new BorderLayout(0,12));form.add(rule,BorderLayout.NORTH);form.add(new JScrollPane(body));
-        form.add(label("최대 500자 · 파일에 저장되어 다음 실행에도 남아요.",12,MUTED,false),BorderLayout.SOUTH);
-        while(JOptionPane.showConfirmDialog(this,form,"내 말로 메모하기",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION) {
-            try {service.addNote(((RuleConcept)rule.getSelectedItem()).id(),body.getText());message("메모를 저장했습니다.");showPage("notes");return;}
-            catch(Exception e){error(e);}
-        }
-    }
-    private void profilesDialog() {
+    void profilesDialog() {
         if(!leaveQuiz())return;
         session=null;
         JComboBox<UserProfile> people=new JComboBox<>(service.profiles().toArray(UserProfile[]::new));people.setSelectedItem(service.user());
@@ -287,9 +229,6 @@ public final class MainFrame extends JFrame {
         }
         showPage("home");
     }
-    private void message(String text) { status.setText(text);refreshHeader(); }
-    private void error(Exception e) { JOptionPane.showMessageDialog(this,e.getMessage(),"확인해 주세요",JOptionPane.WARNING_MESSAGE); }
-    private static void listen(JTextField field,Runnable update) {
-        field.getDocument().addDocumentListener(new DocumentListener(){public void insertUpdate(DocumentEvent e){update.run();}public void removeUpdate(DocumentEvent e){update.run();}public void changedUpdate(DocumentEvent e){update.run();}});
-    }
+    void message(String text) { status.setText(text);refreshHeader(); }
+    void error(Exception e) { JOptionPane.showMessageDialog(this,e.getMessage(),"확인해 주세요",JOptionPane.WARNING_MESSAGE); }
 }

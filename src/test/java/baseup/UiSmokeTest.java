@@ -69,7 +69,7 @@ public final class UiSmokeTest {
         try {
             edt(()->{frame=new MainFrame(service);frame.setSize(1360,940);frame.addNotify();frame.validate();});snapshot("01-home");
             edt(()->{
-                check(components().stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(b->"잠김".equals(b.getText())&&!b.isEnabled()).count()==25,"25 future steps locked");
+                check(components().stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(b->b.getName()!=null&&b.getName().startsWith("lesson-")).count()==3,"home shows 3 next lessons");
                 check(components().stream().filter(JLabel.class::isInstance).map(JLabel.class::cast).noneMatch(l->l.getText().contains("포스")||l.getText().contains("태그업")),"Future content hidden");
                 click("STEP 1 시작하기   →");
             });snapshot("02-quiz");
