@@ -7,6 +7,10 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.AWTEventListener;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -19,23 +23,49 @@ public final class MainFrame extends JFrame {
     private final CardLayout cards = new CardLayout();
     private final JPanel workspace = new JPanel(cards);
     private final Map<String, JButton> navigation = new LinkedHashMap<>();
+    private JPanel myPageSubmenu;
+    private DashboardStyle.NavButton accountNav;
     private final JLabel location = label("학습 홈", 15, INK, true);
     private final JLabel xp = label("", 13, GREEN, true);
     private final JLabel status = label("학습 준비 완료 · 기록은 이 컴퓨터에 저장됩니다", 12, MUTED, false);
-    private final JButton profile = button("", false, this::profilesDialog);
+    private final JButton profile;
+    private final Runnable logoutAction;
     private QuizSession session;
     private String currentPage = "home";
+    private final Deque<String> backHistory = new ArrayDeque<>();
+    private final Deque<String> forwardHistory = new ArrayDeque<>();
+    private final JButton backButton = new JButton("←");
+    private final JButton forwardButton = new JButton("→");
+    private AWTEventListener mouseHistoryListener;
 
-    public MainFrame(LearningService service) {
-        super("BASEUP · 야구를 읽는 첫걸음 | V1 + V2 통합"); this.service=service;
+    // 기존 테스트와 독립 UI 미리보기 호환용 생성자
+    public MainFrame(LearningService service) { this(service, null); }
+
+    public MainFrame(LearningService service, Runnable logoutAction) {
+        super("BASEUP · 야구를 읽는 첫걸음 | V1 + V2 통합");
+        this.service=service;this.logoutAction=logoutAction;
+        this.profile=button("",false,this::handleProfileAction);
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosing(java.awt.event.WindowEvent e) { if (leaveQuiz()) { dispose(); System.exit(0); } }
         });
         setLayout(new BorderLayout()); super.add(sidebar(),BorderLayout.WEST);
         JPanel main=new JPanel(new BorderLayout()); main.setBackground(BG);
-        JPanel top=new JPanel(new BorderLayout()); top.setBackground(WHITE); top.setBorder(new EmptyBorder(18,30,18,30));
-        top.add(location,BorderLayout.WEST); top.add(xp,BorderLayout.EAST); main.add(top,BorderLayout.NORTH);
+        JPanel top=new JPanel(new BorderLayout()); top.setBackground(DashboardStyle.CANVAS); top.setBorder(new EmptyBorder(13,30,13,30));
+        JPanel breadcrumbs = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        breadcrumbs.setOpaque(false);
+        for (JButton arrow : new JButton[]{backButton, forwardButton}) {
+            arrow.setFont(font(18, true)); arrow.setFocusPainted(false);
+            arrow.setOpaque(false); arrow.setContentAreaFilled(false);
+            arrow.setBorder(new EmptyBorder(3, 8, 3, 8));
+            arrow.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        }
+        backButton.setToolTipText("뒤로가기 (Alt+← / 마우스 뒤로가기 버튼)");
+        forwardButton.setToolTipText("앞으로가기 (Alt+→ / 마우스 앞으로가기 버튼)");
+        backButton.addActionListener(e -> goBack());
+        forwardButton.addActionListener(e -> goForward());
+        breadcrumbs.add(backButton); breadcrumbs.add(forwardButton); breadcrumbs.add(location);
+        top.add(breadcrumbs,BorderLayout.WEST); top.add(xp,BorderLayout.EAST); main.add(top,BorderLayout.NORTH);
         main.add(workspace,BorderLayout.CENTER);
         JPanel footer=new JPanel(new BorderLayout()); footer.setBackground(BG); footer.setBorder(new EmptyBorder(9,30,12,30));
         footer.add(status,BorderLayout.WEST); footer.add(label("BASEUP / V2.1",11,MUTED,true),BorderLayout.EAST);
@@ -44,50 +74,139 @@ public final class MainFrame extends JFrame {
         Dimension screen=Toolkit.getDefaultToolkit().getScreenSize();
         setSize(Math.min(1360,screen.width-70),Math.min(940,screen.height-70));
         setLocationRelativeTo(null); showPage("home");
+        installHistoryControls();
     }
     private JPanel sidebar() {
-        JPanel side=new JPanel(new BorderLayout()); side.setBackground(NAVY); side.setPreferredSize(new Dimension(210,700));
-        side.setBorder(new EmptyBorder(30,20,24,20));
+        DashboardStyle.Sidebar side=new DashboardStyle.Sidebar();
+        side.setLayout(new BorderLayout());
+        side.setPreferredSize(new Dimension(236,700));
+        side.setBorder(new EmptyBorder(30,18,22,18));
         JPanel body=column();
-        Theme.add(body,label("BASEUP",29,WHITE,true)); gap(body,4);
-        Theme.add(body,label("야구를 읽는 첫걸음",12,new Color(0x9EB8AE),false)); gap(body,42);
-        Theme.add(body,label("MY CLUBHOUSE",10,new Color(0x7F9B91),true)); gap(body,14);
-        String[][] menus={{"home","01   학습 홈"},{"missions","02   나의 학습 경로"},{"library","03   발견한 규칙"},
-                {"records","04   나의 성장"},{"notes","05   나의 메모"}};
-        for(String[] menu:menus) {
-            JButton b=new JButton(menu[1]); b.setFont(font(14,true)); b.setHorizontalAlignment(SwingConstants.LEFT);
-            b.setForeground(new Color(0xBDCDC6)); b.setBackground(NAVY); b.setOpaque(true);
-            b.setBorder(new EmptyBorder(14,14,14,8)); b.setFocusPainted(true);
-            b.setMaximumSize(new Dimension(Integer.MAX_VALUE,49)); b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            b.addActionListener(e -> navigate(menu[0])); navigation.put(menu[0],b); Theme.add(body,b); gap(body,5);
-        }
+        Theme.add(body,label("BASEUP",30,WHITE,true));gap(body,6);
+        Theme.add(body,label("야구를 읽는 첫걸음",13,new Color(0xB1D1C3),false));gap(body,42);
+        Theme.add(body,label("MY CLUBHOUSE",10,new Color(0xA7CDBE),true));gap(body,17);
+        Theme.add(body,navButton("home","학습 홈","home",false));gap(body,5);
+        Theme.add(body,navButton("library","발견한 규칙","rule",false));gap(body,5);
+        Theme.add(body,navButton("mypage","마이페이지","user",false));gap(body,5);
+        myPageSubmenu=column();
+        Theme.add(myPageSubmenu,navButton("missions","나의 학습 경로","flag",true));gap(myPageSubmenu,1);
+        Theme.add(myPageSubmenu,navButton("records","나의 성장","growth",true));gap(myPageSubmenu,1);
+        Theme.add(myPageSubmenu,navButton("notes","나의 메모","notes",true));gap(myPageSubmenu,1);
+        myPageSubmenu.setVisible(false);
+        Theme.add(body,myPageSubmenu);gap(body,5);
+        accountNav=new DashboardStyle.NavButton("내 정보","gear",false);
+        accountNav.addActionListener(e->navigate("account"));
+        Theme.add(body,accountNav);
         side.add(body,BorderLayout.NORTH);
         JPanel bottom=column();
-        Theme.add(bottom,label("서두르지 않아도 괜찮아요.",12,new Color(0xB9CBC2),false)); gap(bottom,5);
-        Theme.add(bottom,label("한 번의 판정이, 하나의 배움.",12,new Color(0xB9CBC2),false)); gap(bottom,22);
-        profile.setMaximumSize(new Dimension(Integer.MAX_VALUE,48)); Theme.add(bottom,profile); side.add(bottom,BorderLayout.SOUTH);
+        Theme.add(bottom,label("서두르지 않아도 괜찮아요.",12,new Color(0xBAD8CB),false));gap(bottom,5);
+        Theme.add(bottom,label("한 번의 판정이, 하나의 배움.",12,new Color(0xBAD8CB),false));gap(bottom,17);
+        profile.setMaximumSize(new Dimension(Integer.MAX_VALUE,46));Theme.add(bottom,profile);
+        side.add(bottom,BorderLayout.SOUTH);
         return side;
     }
-    private void navigate(String page) { if (leaveQuiz()) { session=null; showPage(page); } }
+
+    private JButton navButton(String page,String title,String icon,boolean nested) {
+        DashboardStyle.NavButton button=new DashboardStyle.NavButton(title,icon,nested);
+        button.addActionListener(e->navigate(page));
+        navigation.put(page,button);
+        return button;
+    }
+
+    private static boolean isMyPageSection(String page) {
+        return page.equals("mypage") || page.equals("missions") || page.equals("records") || page.equals("notes");
+    }
+    private void navigate(String page) {
+        if (page.equals(currentPage) && session == null) return;
+        if (!leaveQuiz()) return;
+        if (!page.equals(currentPage)) { backHistory.push(currentPage); forwardHistory.clear(); }
+        session = null;
+        showPage(page);
+    }
+
+    private void goBack() {
+        if (backHistory.isEmpty() || !leaveQuiz()) return;
+        forwardHistory.push(currentPage);
+        session = null;
+        showPage(backHistory.pop());
+    }
+
+    private void goForward() {
+        if (forwardHistory.isEmpty() || !leaveQuiz()) return;
+        backHistory.push(currentPage);
+        session = null;
+        showPage(forwardHistory.pop());
+    }
+
+    private void installHistoryControls() {
+        JRootPane root = getRootPane();
+        InputMap keys = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actions = root.getActionMap();
+        keys.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, InputEvent.ALT_DOWN_MASK), "history-back");
+        keys.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, InputEvent.ALT_DOWN_MASK), "history-forward");
+        actions.put("history-back", new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { goBack(); }
+        });
+        actions.put("history-forward", new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { goForward(); }
+        });
+        // Windows 등에서 JVM이 별도 마우스 버튼을 전달하는 경우에만 작동.
+        // 장치/드라이버에 따라 전달되지 않을 수 있으므로 화면 버튼과 Alt+화살표도 제공한다.
+        mouseHistoryListener = event -> {
+            if (!(event instanceof MouseEvent mouse) || mouse.getID() != MouseEvent.MOUSE_PRESSED) return;
+            int mouseButton = mouse.getButton();
+            if (mouseButton != 4 && mouseButton != 5) return;
+            if (!(mouse.getSource() instanceof Component source)
+                    || SwingUtilities.getWindowAncestor(source) != this) return;
+            SwingUtilities.invokeLater(() -> {
+                if (!isDisplayable()) return;
+                if (mouseButton == 4) goBack(); else goForward();
+            });
+        };
+        Toolkit.getDefaultToolkit().addAWTEventListener(mouseHistoryListener, AWTEvent.MOUSE_EVENT_MASK);
+    }
+
+    @Override public void dispose() {
+        if (mouseHistoryListener != null) {
+            Toolkit.getDefaultToolkit().removeAWTEventListener(mouseHistoryListener);
+            mouseHistoryListener = null;
+        }
+        super.dispose();
+    }
     private boolean leaveQuiz() {
         if (session==null || session.stage()==QuizSession.Stage.COMPLETE) return true;
         return JOptionPane.showConfirmDialog(this,"미션을 나갈까요?\n이미 제출한 판정은 저장됩니다. 아직 제출하지 않은 선택은 저장되지 않습니다.\n완료하지 않은 단계는 처음부터 다시 시작해요.",
                 "미션 나가기",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION;
     }
     private void refreshHeader() {
-        xp.setText(service.rank()+"   /   "+service.xp()+" XP"); profile.setText(service.user().nickname()+"  · 변경");
+        xp.setText(service.rank()+"   /   "+service.xp()+" XP"); profile.setText(service.user().nickname()+"  · 내 정보");
     }
     private void showPage(String page) {
         currentPage=page; refreshHeader();
+        backButton.setEnabled(!backHistory.isEmpty());
+        forwardButton.setEnabled(!forwardHistory.isEmpty());
+        if (myPageSubmenu != null) myPageSubmenu.setVisible(isMyPageSection(page));
         for(var entry:navigation.entrySet()) {
-            entry.getValue().setBackground(entry.getKey().equals(page)?new Color(0x285044):NAVY);
-            entry.getValue().setForeground(entry.getKey().equals(page)?WHITE:new Color(0xBDCDC6));
+            boolean chosen=entry.getKey().equals(page)
+                    || (entry.getKey().equals("mypage") && isMyPageSection(page));
+            if(entry.getValue() instanceof DashboardStyle.NavButton nav) nav.setSelectedPage(chosen);
         }
+        if(accountNav!=null)accountNav.setSelectedPage("account".equals(page));
         JComponent content=switch(page) {
-            case "missions" -> missions(); case "library" -> library(); 
+            case "mypage" -> new MyPagePanel(service,this::navigate,this::handleAccountAction,logoutAction!=null,this::startNext);
+            case "account" -> accountPage();
+            case "missions" -> missions(); case "library" -> library();
             case "records" -> records(); case "notes" -> notes(); default -> home();
         };
-        location.setText(switch(page) {case "missions"->"나의 학습 경로";case "library"->"발견한 규칙";case "records"->"나의 성장";case "notes"->"나의 메모";default->"학습 홈";});
+        location.setText(switch(page) {
+            case "mypage" -> "마이페이지";
+            case "missions" -> "마이페이지  /  나의 학습 경로";
+            case "records" -> "마이페이지  /  나의 성장";
+            case "notes" -> "마이페이지  /  나의 메모";
+            case "library" -> "발견한 규칙";
+            case "account" -> "내 정보";
+            default -> "학습 홈";
+        });
         workspace.removeAll(); workspace.add(content,page); cards.show(workspace,page); workspace.revalidate(); workspace.repaint();
     }
     private JPanel page(String kicker,String title,String subtitle) {
@@ -156,7 +275,11 @@ public final class MainFrame extends JFrame {
     }
     private void showQuiz(QuizSession next,String title) {
         session=next;location.setText("심판 미션  /  "+title);
-        navigation.values().forEach(b->b.setBackground(NAVY));
+        navigation.values().forEach(b->{
+            if(b instanceof DashboardStyle.NavButton nav) nav.setSelectedPage(false);
+            else b.setBackground(NAVY);
+        });
+        if(accountNav!=null)accountNav.setSelectedPage(false);
         QuizPanel quiz=new QuizPanel(service,session,this::completed,()->{if(leaveQuiz()){session=null;showPage("missions");}},this::message,this::error);
         workspace.removeAll();workspace.add(quiz,"quiz");cards.show(workspace,"quiz");workspace.revalidate();workspace.repaint();
     }
@@ -247,20 +370,44 @@ public final class MainFrame extends JFrame {
         JPanel p=page("MY FIELD NOTES","내 말로 남기는 규칙.","원할 때만 남기는 개인 메모예요. 다음 단계로 가기 위해 작성할 필요는 없어요.");
         JPanel controls=new JPanel(new BorderLayout(12,0));controls.setOpaque(false);JTextField search=input("메모 내용이나 규칙 이름 검색");
         controls.setMaximumSize(new Dimension(Integer.MAX_VALUE,48));
-        controls.add(search,BorderLayout.CENTER);controls.add(button("+ 메모 추가",true,()->noteDialog(null)),BorderLayout.EAST);Theme.add(p,controls);gap(p,20);
+        JPanel right=new JPanel(new FlowLayout(FlowLayout.RIGHT,12,0));right.setOpaque(false);
+        JCheckBox favoriteOnly=new JCheckBox("★ 즐겨찾기만"); favoriteOnly.setOpaque(false);
+        right.add(favoriteOnly);right.add(button("+ 메모 추가",true,()->noteDialog(null)));
+        controls.add(search,BorderLayout.CENTER);controls.add(right,BorderLayout.EAST);Theme.add(p,controls);gap(p,20);
         JPanel results=column();Theme.add(p,results);
         Runnable refresh=()->{
-            results.removeAll();List<StudyNote> list=service.notes(search.getText());
-            if(list.isEmpty())Theme.add(results,label("메모가 없습니다. 기억하고 싶은 규칙을 내 말로 적어보세요.",14,MUTED,false));
+            results.removeAll();List<StudyNote> list=service.notes(search.getText()).stream()
+                    .filter(n->!favoriteOnly.isSelected()||service.noteFavorited(n.id())).toList();
+            if(list.isEmpty())Theme.add(results,label("메모가 없습니다. 메모를 추가하거나 즐겨찾기를 확인해 보세요.",14,MUTED,false));
             for(StudyNote note:list) {
-                RoundedPanel c=card();c.setLayout(new BorderLayout(20,12));c.add(label(service.catalog().rule(note.ruleId()).title(),15,GREEN,true),BorderLayout.NORTH);
+                RoundedPanel c=card();c.setLayout(new BorderLayout(20,12));
+                c.add(label(service.catalog().rule(note.ruleId()).title(),15,GREEN,true),BorderLayout.NORTH);
                 JTextArea body=paragraph(note.text(),Math.min(15,Math.max(2,(note.text().length()+49)/50+note.text().split("\n").length)));
-                c.add(body,BorderLayout.CENTER);c.add(button("삭제",false,()->{
+                c.add(body,BorderLayout.CENTER);
+                JPanel actions=column();
+                Theme.add(actions,button(service.noteFavorited(note.id())?"★ 해제":"☆ 즐겨찾기",false,()->{
+                    try{service.toggleNoteFavorite(note.id());showPage("notes");}catch(Exception e){error(e);}
+                }));gap(actions,8);
+                Theme.add(actions,button("수정",false,()->editNoteDialog(note)));gap(actions,8);
+                Theme.add(actions,button("삭제",false,()->{
                     if(JOptionPane.showConfirmDialog(this,"이 메모를 삭제할까요?","메모 삭제",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION)
                         try{service.deleteNote(note.id());message("메모를 삭제했습니다.");showPage("notes");}catch(Exception e){error(e);}
-                }),BorderLayout.EAST);Theme.add(results,c);gap(results,12);
+                }));
+                c.add(actions,BorderLayout.EAST);Theme.add(results,c);gap(results,12);
             }results.revalidate();results.repaint();
-        };listen(search,refresh);refresh.run();return scroll(p);
+        };listen(search,refresh);favoriteOnly.addActionListener(e->refresh.run());refresh.run();return scroll(p);
+    }
+    private void editNoteDialog(StudyNote existing) {
+        JTextArea body=new JTextArea(existing.text(),7,36);
+        body.setLineWrap(true);body.setWrapStyleWord(true);body.setFont(font(14,false));
+        JPanel form=new JPanel(new BorderLayout(0,12));
+        form.add(label("관련 규칙: "+service.catalog().rule(existing.ruleId()).title(),13,GREEN,true),BorderLayout.NORTH);
+        form.add(new JScrollPane(body),BorderLayout.CENTER);
+        form.add(label("메모 내용 수정 · 최대 500자",12,MUTED,false),BorderLayout.SOUTH);
+        while(JOptionPane.showConfirmDialog(this,form,"메모 수정",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION) {
+            try{service.updateNote(existing.id(),body.getText());message("메모를 수정했습니다.");showPage("notes");return;}
+            catch(Exception e){error(e);}
+        }
     }
     private void noteDialog(RuleConcept initial) {
         List<RuleConcept> discovered=service.catalog().rules().stream().filter(r->service.discovered(r.id())).toList();
@@ -273,6 +420,35 @@ public final class MainFrame extends JFrame {
             try {service.addNote(((RuleConcept)rule.getSelectedItem()).id(),body.getText());message("메모를 저장했습니다.");showPage("notes");return;}
             catch(Exception e){error(e);}
         }
+    }
+    /** 개인 정보 페이지는 로그인 서비스의 기존 데이터만 표시하며, 실제 변경 저장 기능은 추가하지 않는다. */
+    private JComponent accountPage() {
+        JPanel page=page("MY CLUBHOUSE / ACCOUNT","내 정보","현재 사용자와 로컬 학습 기록을 확인할 수 있어요.");
+        DashboardStyle.Surface info=new DashboardStyle.Surface(WHITE,22);
+        info.setLayout(new BorderLayout(0,18));
+        info.setBorder(new EmptyBorder(27,30,27,30));
+        info.setMaximumSize(new Dimension(Integer.MAX_VALUE,260));
+        JPanel labels=column();
+        Theme.add(labels,label("CURRENT ACCOUNT",12,GREEN,true));gap(labels,15);
+        Theme.add(labels,label(service.user().nickname(),27,INK,true));gap(labels,12);
+        Theme.add(labels,label(service.rank()+"  ·  "+service.xp()+" XP",15,MUTED,false));gap(labels,14);
+        Theme.add(labels,label("이 계정의 학습 기록은 현재 컴퓨터에 저장됩니다.",13,MUTED,false));
+        info.add(labels,BorderLayout.CENTER);
+        JPanel actions=new JPanel(new FlowLayout(FlowLayout.LEFT,12,0));actions.setOpaque(false);
+        actions.add(button("마이페이지로 돌아가기",true,()->navigate("mypage")));
+        actions.add(button(logoutAction!=null?"로그아웃":"사용자 전환",false,this::handleAccountAction));
+        info.add(actions,BorderLayout.SOUTH);
+        Theme.add(page,info);
+        return scroll(page);
+    }
+    private void handleProfileAction() { navigate("account"); }
+    private void handleAccountAction() {
+        if (logoutAction == null) { profilesDialog(); return; } // 기존 단독 실행 호환
+        if (JOptionPane.showConfirmDialog(this,
+                "로그아웃하고 다른 계정으로 로그인할까요?\n학습 기록은 이 컴퓨터에 저장됩니다.",
+                "로그아웃",JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
+        dispose();
+        logoutAction.run();
     }
     private void profilesDialog() {
         if(!leaveQuiz())return;

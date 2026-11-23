@@ -2,7 +2,9 @@ package baseup;
 
 import baseup.repository.Catalog;
 import baseup.service.LearningService;
+import baseup.service.AuthService;
 import baseup.ui.MainFrame;
+import baseup.ui.LoginFrame;
 import baseup.ui.Theme;
 import javax.swing.*;
 import java.nio.channels.*;
@@ -26,12 +28,19 @@ public final class App {
                 try { lock.release(); channel.close(); } catch (Exception ignored) { }
             }));
             LearningService service = new LearningService(new Catalog(root.resolve("data")), userDir);
-            SwingUtilities.invokeLater(() -> new MainFrame(service).setVisible(true));
+            AuthService auth = new AuthService(service, userDir);
+            SwingUtilities.invokeLater(() -> showLogin(service, auth, root));
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, "BASEUP을 시작할 수 없습니다.\n\n" + e.getMessage()
                     + "\n\n기존 파일은 자동으로 초기화하지 않습니다. README의 문제 해결을 확인해 주세요.",
                     "BASEUP 시작 안내", JOptionPane.ERROR_MESSAGE);
             System.exit(1);
         }
+    }
+    private static void showLogin(LearningService service, AuthService auth, Path root) {
+        new LoginFrame(auth, root, user -> {
+            MainFrame main = new MainFrame(service, () -> showLogin(service, auth, root));
+            main.setVisible(true);
+        }).setVisible(true);
     }
 }
