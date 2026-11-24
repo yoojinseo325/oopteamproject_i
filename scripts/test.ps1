@@ -18,6 +18,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Service tests failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Rule encyclopedia tests failed.' }
 & $java -cp "build/classes;$testClasses" baseup.FeatureTeamServicesTest
 if ($LASTEXITCODE -ne 0) { throw 'Feature team service tests failed.' }
+& $java -cp "build/classes;$testClasses" baseup.GameStateTest
+if ($LASTEXITCODE -ne 0) { throw 'Game state tests failed.' }
 & $java -cp "build/classes;$testClasses" baseup.RepositoryContractTest
 if ($LASTEXITCODE -ne 0) { throw 'Repository contract tests failed.' }
 & $java -cp "build/classes;$testClasses" baseup.StepFlowTest

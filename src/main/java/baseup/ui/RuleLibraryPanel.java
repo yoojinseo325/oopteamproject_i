@@ -38,12 +38,17 @@ public final class RuleLibraryPanel extends JPanel {
     private final LearningService service;
     private final ScreenActions actions;
     private final RuleEncyclopedia book;
+    private final String initialRuleId;
 
-    public RuleLibraryPanel(LearningService service, ScreenActions actions) {
+    public RuleLibraryPanel(LearningService service, ScreenActions actions) { this(service, actions, null); }
+
+    /** initialRuleId가 있으면 그 규칙을 선택한 상태로 연다(홈 검색에서 규칙을 눌렀을 때). */
+    public RuleLibraryPanel(LearningService service, ScreenActions actions, String initialRuleId) {
         super(new BorderLayout());
         this.service = service;
         this.actions = actions;
         this.book = new RuleEncyclopedia(service.catalog());
+        this.initialRuleId = initialRuleId;
         setOpaque(false);
         add(build(), BorderLayout.CENTER);
     }
@@ -156,6 +161,7 @@ public final class RuleLibraryPanel extends JPanel {
             if(!e.getValueIsAdjusting())render[0].run();
         });
         filter.run();
+        book.find(initialRuleId==null?"":initialRuleId).ifPresent(r->list.setSelectedValue(r,true));
         return outer;
     }
 
