@@ -17,10 +17,12 @@ public final class LearningService implements QuestionSource {
     private final Repository<Attempt> attemptRepository;
     private final Repository<Bookmark> bookmarkRepository;
     private final Repository<StudyNote> noteRepository;
+    private final Repository<NoteFavorite> noteFavoriteRepository;
     private final Manager<UserProfile> profiles;
     private final Manager<Attempt> attempts;
     private final Manager<Bookmark> bookmarks;
     private final Manager<StudyNote> notes;
+    private final Manager<NoteFavorite> noteFavorites;
     private final Repository<StepCompletion> completionRepository;
     private final Manager<StepCompletion> completions;
     private UserProfile currentUser;
@@ -45,6 +47,8 @@ public final class LearningService implements QuestionSource {
         attempts = new Manager<>(attemptRepository.load());
         bookmarks = new Manager<>(bookmarkRepository.load());
         notes = new Manager<>(noteRepository.load());
+        noteFavoriteRepository = repositories.noteFavorites();
+        noteFavorites = new Manager<>(noteFavoriteRepository.load());
         completions = new Manager<>(completionRepository.load());
         if (profiles.all().isEmpty()) addProfile("신입 심판");
         currentUser = profiles.all().get(0);
@@ -161,13 +165,78 @@ public final class LearningService implements QuestionSource {
         return notes.search(n -> n.userId().equals(currentUser.id())
                 && (n.text() + catalog.rule(n.ruleId()).title()).toLowerCase(Locale.ROOT).contains(term));
     }
+    /** 마지막으로 문제를 풀었던 학습 단계. 제출 기록이 없으면 최근 완료 단계로 대체한다. */
+    public Optional<LearningStep> lastStudiedStep() {
+        List<Attempt> history = attempts();
+        for (int i = history.size() - 1; i >= 0; i--) {
+            String questionId = history.get(i).questionId();
+            Optional<LearningStep> step = steps().stream()
+                    .filter(s -> s.questionIds().contains(questionId)).findFirst();
+            if (step.isPresent()) return step;
+        }
+        return completions.all().stream().filter(c -> c.userId().equals(currentUser.id()))
+                .max(Comparator.comparing(StepCompletion::at))
+                .flatMap(c -> steps().stream().filter(s -> s.key() == c.step()).findFirst());
+    }
+
+    /** 저장한 순서에서 가장 최근에 제출한 문제를 반환한다. */
+    public Optional<Attempt> lastAttempt() {
+        List<Attempt> history = attempts();
+        return history.isEmpty() ? Optional.empty() : Optional.of(history.get(history.size() - 1));
+    }
+
+    public boolean noteFavorited(String noteId) {
+        return noteFavorites.find(currentUser.id() + ":" + noteId).isPresent();
+    }
+
+    public List<StudyNote> favoriteNotes() {
+        return notes("").stream().filter(n -> noteFavorited(n.id())).toList();
+    }
+
+    private StudyNote ownedNote(String noteId) {
+        return notes.find(noteId).filter(n -> n.userId().equals(currentUser.id()))
+                .orElseThrow(() -> new IllegalArgumentException("현재 사용자의 메모가 아닙니다."));
+    }
+
+    public void toggleNoteFavorite(String noteId) throws IOException {
+        ownedNote(noteId);
+        String id = currentUser.id() + ":" + noteId;
+        if (noteFavorited(noteId))
+            saveRemoved(noteFavoriteRepository, noteFavorites, f -> f.id().equals(id));
+        else
+            saveAdded(noteFavoriteRepository, noteFavorites,
+                    new NoteFavorite(id, currentUser.id(), noteId));
+    }
+
+    /** 기존 ID/규칙/소유자를 유지하고 본문만 변경한다. 저장 실패 시 메모리 상태는 유지된다. */
+    public void updateNote(String noteId, String text) throws IOException {
+        StudyNote previous = ownedNote(noteId);
+        String clean = validatedNoteText(text);
+        StudyNote updated = new StudyNote(previous.id(), previous.userId(), previous.ruleId(), clean);
+        List<StudyNote> copy = new ArrayList<>(notes.all());
+        for (int i = 0; i < copy.size(); i++)
+            if (copy.get(i).id().equals(noteId)) { copy.set(i, updated); break; }
+        noteRepository.save(copy);
+        notes.replace(updated);
+    }
+
+    private static String validatedNoteText(String text) {
+        if (text == null || text.isBlank() || text.length() > 500)
+            throw new IllegalArgumentException("메모는 1~500자로 입력해 주세요.");
+        return text.strip();
+    }
+
     public void addNote(String ruleId, String text) throws IOException {
         catalog.rule(ruleId);
-        if (text.isBlank() || text.length() > 500) throw new IllegalArgumentException("메모는 1~500자로 입력해 주세요.");
-        saveAdded(noteRepository, notes, new StudyNote(UUID.randomUUID().toString(), currentUser.id(), ruleId, text.strip()));
+        saveAdded(noteRepository, notes,
+                new StudyNote(UUID.randomUUID().toString(), currentUser.id(), ruleId, validatedNoteText(text)));
     }
     public void deleteNote(String id) throws IOException {
+        ownedNote(id);
         saveRemoved(noteRepository, notes, n -> n.userId().equals(currentUser.id()) && n.id().equals(id));
+        // 삭제 후 남을 수 있는 즐겨찾기 표식도 정리한다.
+        saveRemoved(noteFavoriteRepository, noteFavorites,
+                f -> f.userId().equals(currentUser.id()) && f.noteId().equals(id));
     }
     private static <T extends Identifiable> void saveAdded(Repository<T> repo, Manager<T> manager, T item) throws IOException {
         List<T> copy = new ArrayList<>(manager.all()); copy.add(item);

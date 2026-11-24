@@ -15,5 +15,10 @@ public final class Manager<T extends Identifiable> {
         if (find(item.id()).isPresent()) throw new IllegalArgumentException("중복 ID: " + item.id());
         items.add(item);
     }
+    public void replace(T item) {
+        for (int i = 0; i < items.size(); i++)
+            if (items.get(i).id().equals(item.id())) { items.set(i, item); return; }
+        throw new IllegalArgumentException("없는 ID: " + item.id());
+    }
     public void remove(String id) { items.removeIf(x -> x.id().equals(id)); }
 }

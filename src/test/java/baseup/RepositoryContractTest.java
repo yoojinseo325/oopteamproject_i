@@ -51,7 +51,8 @@ public final class RepositoryContractTest {
         MemoryRepository<Bookmark> bookmarks = new MemoryRepository<>();
         MemoryRepository<StudyNote> notes = new MemoryRepository<>();
         MemoryRepository<StepCompletion> completions = new MemoryRepository<>();
-        UserRepositories stores = new UserRepositories(profiles, attempts, bookmarks, notes, completions);
+        MemoryRepository<NoteFavorite> noteFavorites = new MemoryRepository<>();
+        UserRepositories stores = new UserRepositories(profiles, attempts, bookmarks, notes, completions, noteFavorites);
         Catalog catalog = new Catalog(Path.of("data"));
         Clock clock = Clock.fixed(Instant.parse("2026-11-15T00:00:00Z"), ZoneOffset.UTC);
         LearningService service = new LearningService(catalog, stores, clock);

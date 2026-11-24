@@ -32,13 +32,19 @@ public final class MainFrame extends JFrame implements ScreenActions {
     private final JLabel location = label("학습 홈", 15, INK, true);
     private final JLabel xp = label("", 13, GREEN, true);
     private final JLabel status = label("학습 준비 완료 · 기록은 이 컴퓨터에 저장됩니다", 12, MUTED, false);
-    private final JButton profile = button("", false, this::profilesDialog);
+    private final JButton profile = button("", false, this::accountAction);
+    /** 로그아웃 후 할 일(로그인 창 다시 띄우기). null이면 로그인 없이 실행한 것으로 보고 사용자 전환을 보여 준다. */
+    private final Runnable logoutAction;
     private QuizSession session;
     private final LearningDialogs dialogs;
 
-    public MainFrame(LearningService service) {
+    /** 로그인 없이 실행(테스트·미리보기)할 때 쓰는 생성자. */
+    public MainFrame(LearningService service) { this(service, null); }
+
+    public MainFrame(LearningService service, Runnable logoutAction) {
         super("BASEUP · 야구를 읽는 첫걸음 | V1 + V2 통합");
         this.service=service;
+        this.logoutAction=logoutAction;
         dialogs = new LearningDialogs(this, service, this);
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         addWindowListener(new java.awt.event.WindowAdapter() {
@@ -97,6 +103,8 @@ public final class MainFrame extends JFrame implements ScreenActions {
                 "records","04   나의 성장"
             },{
                 "notes","05   나의 메모"
+            },{
+                "mypage","06   마이페이지"
             }
         };
         for(String[] menu:menus) {
@@ -140,7 +148,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
     private void refreshHeader() {
         LearningStatistics stats = service.statistics();
         xp.setText(stats.rank()+"   /   "+stats.xp()+" XP");
-        profile.setText(service.user().nickname()+"  · 변경");
+        profile.setText(service.user().nickname()+(logoutAction!=null?"  · 로그아웃":"  · 변경"));
     }
     @Override public void showPage(String page) {
         refreshHeader();
@@ -153,6 +161,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
             case "library" -> new RuleLibraryPanel(service, this);
             case "records" -> new RecordsPanel(service);
             case "notes" -> new NotesPanel(service, this);
+            case "mypage" -> new MyPagePanel(service, this::navigate, this::accountAction, logoutAction!=null, this::startNext);
             default -> new HomePanel(service, this);
         };
         location.setText(switch(page) {
@@ -160,6 +169,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
             case "library"->"규칙 백과사전";
             case "records"->"나의 성장";
             case "notes"->"나의 메모";
+            case "mypage"->"마이페이지";
             default->"학습 홈";
         });
         workspace.removeAll();
@@ -200,6 +210,16 @@ public final class MainFrame extends JFrame implements ScreenActions {
         workspace.revalidate();
         workspace.repaint();
         message("미션 완료 · 모든 제출 기록을 저장했습니다.");
+    }
+    /** 로그인해서 실행했으면 로그아웃, 아니면 기존 사용자 전환. */
+    private void accountAction() {
+        if (logoutAction == null) { profilesDialog(); return; }
+        if (!leaveQuiz()) return;
+        if (JOptionPane.showConfirmDialog(this, "로그아웃하고 다른 계정으로 로그인할까요?\n학습 기록은 이 컴퓨터에 저장됩니다.",
+                "로그아웃", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
+        session = null;
+        dispose();
+        logoutAction.run();
     }
     private void profilesDialog() {
         if (!leaveQuiz()) return;

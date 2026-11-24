@@ -11,13 +11,15 @@ public record UserRepositories(Repository<UserProfile> profiles,
                                Repository<Attempt> attempts,
                                Repository<Bookmark> bookmarks,
                                Repository<StudyNote> notes,
-                               Repository<StepCompletion> completions) {
+                               Repository<StepCompletion> completions,
+                               Repository<NoteFavorite> noteFavorites) {
     public UserRepositories {
         Objects.requireNonNull(profiles);
         Objects.requireNonNull(attempts);
         Objects.requireNonNull(bookmarks);
         Objects.requireNonNull(notes);
         Objects.requireNonNull(completions);
+        Objects.requireNonNull(noteFavorites);
     }
 
     public static UserRepositories files(Path userDir) {
@@ -36,9 +38,12 @@ public record UserRepositories(Repository<UserProfile> profiles,
         Repository<StepCompletion> completionRepository = new FileRepository<>(userDir.resolve("steps.tsv"), "id\tuserId\tstep\tat",
                 f -> new StepCompletion(f[0], f[1], Integer.parseInt(f[2]), Instant.parse(f[3])),
                 x -> line(x.id(), x.userId(), "" + x.step(), x.at().toString()));
+        // 메모 즐겨찾기(마이페이지). 이전 버전에는 파일이 없으므로 빈 목록으로 시작한다.
+        Repository<NoteFavorite> noteFavoriteRepository = new FileRepository<>(userDir.resolve("note_favorites.tsv"),
+                "id\tuserId\tnoteId", f -> new NoteFavorite(f[0], f[1], f[2]), x -> line(x.id(), x.userId(), x.noteId()));
 
         return new UserRepositories(profileRepository, attemptRepository, bookmarkRepository,
-                noteRepository, completionRepository);
+                noteRepository, completionRepository, noteFavoriteRepository);
     }
 
     private static boolean bool(String text) {
