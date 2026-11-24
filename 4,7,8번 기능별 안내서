@@ -1,0 +1,79 @@
+# BASEUP 백엔드 4·7·8번 기능별 파일 안내
+
+## 4번 — 마이페이지 통계
+- `StatisticsManager.java` : 통계 계산
+- `UserStatistics.java` : 사용자 통계 데이터
+- `ResultRepository.java` : 퀴즈 결과 저장 및 조회
+- `StudyRepository.java` : 학습 기록 관리
+
+## 7번 — 객관식·단답형 혼합 퀴즈
+- `QuestionType.java` : 문제 유형 구분
+- `QuizQuestion.java` : 문제와 정답 데이터
+- `AnswerChecker.java` : 정답 판정
+- `QuizSession.java` : 퀴즈 진행 및 점수 계산
+- `QuestionRepository.java` : 문제 데이터 관리
+- `QuestionMigration.java` : 문제 데이터 형식 변환
+
+## 8번 — 영상형 시나리오
+- `ScenarioManager.java` : 영상 문제와 영상 파일 연결
+- `QuizQuestion.java` : 시나리오 문제 정보
+- `QuizSession.java` : 답안 제출 및 채점
+
+## 공통 코드
+- `BackendFacade.java` : 백엔드 기능 호출을 위한 공통 연결 클래스
+- `QuizResult.java` : 퀴즈 결과 데이터
+
+**참고:** 일부 클래스는 여러 기능에서 공통으로 사용합니다. 현재 코드는 별도 패키지에 있으며, 기존 팀 프로젝트와의 통합 작업은 필요합니다.
+
+
+
+
+
+## BACKEND_MERGE_FILES 기능별 코드 위치
+
+모든 Java 파일의 기본 경로:
+`BACKEND_MERGE_FILES/src/main/java/baseup/shortapp/`
+
+### 4번 — 마이페이지 통계
+**service 폴더**
+- `StatisticsManager.java`
+
+**model 폴더**
+- `UserStatistics.java`
+- `QuizResult.java`
+
+**data 폴더**
+- `ResultRepository.java`
+- `StudyRepository.java`
+
+### 7번 — 객관식 + 단답형 혼합 퀴즈
+**service 폴더**
+- `AnswerChecker.java`
+- `QuizSession.java`
+- `QuestionMigration.java`
+
+**model 폴더**
+- `QuestionType.java`
+- `QuizQuestion.java`
+- `QuizResult.java`
+
+**data 폴더**
+- `QuestionRepository.java`
+
+**문제 데이터**
+- `BACKEND_MERGE_FILES/data/short_questions.tsv`
+
+### 8번 — 영상형 시나리오
+**service 폴더**
+- `ScenarioManager.java`
+- `AnswerChecker.java` (7번과 공통)
+- `QuizSession.java` (7번과 공통)
+
+**model 폴더**
+- `QuizQuestion.java` (7번과 공통)
+
+### 4·7·8번 공통 연결 코드
+**service 폴더**
+- `BackendFacade.java`
+
+일부 파일은 여러 기능에서 공통으로 사용합니다. 현재 기존 팀 프로젝트와 통합하기 전의 별도 백엔드 코드입니다.
