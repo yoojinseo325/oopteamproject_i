@@ -93,3 +93,13 @@ V2 삽화의 인물은 일반적인 야구 선수 그림입니다. KBO 선수·�
 | `find(id)`, `related(id, limit)` | 규칙 하나 찾기, 같이 보면 좋은 규칙 |
 
 검색 점수는 제목 완전 일치 100 > 키워드 완전 일치 95 > 제목 시작 90 > 제목 포함 80 > 키워드 포함 70 > 문장 속 제목/키워드("보크가 뭐야") 60/55 > 요약 40 > 설명 25 > 분류 20 > 출처 15입니다. 여러 단어 검색은 모든 단어가 맞은 규칙을 우선합니다. 단답형 채점(기능 7)은 `TextNormalizer.matchesAny(입력, 허용답안목록)`을 그대로 쓸 수 있습니다. 검사는 `RuleEncyclopediaTest`에 있습니다.
+
+## 진행 게이지·오늘의 규칙·로그인 세션 (기능 1·2·3)
+
+| 클래스 | 사용법 |
+| --- | --- |
+| `service/StepProgressCalculator` | `course()` 전체 STEP, `currentStep()`/`step(n)` STEP 안 문제, `rules()` 만나 본 규칙, `session(quiz)` 진행 중 퀴즈. 결과 `Gauge`의 `percent()`(0~100)와 `label()`("3 / 26")을 그대로 그립니다. |
+| `service/DailyRuleService` | `new DailyRuleService(service.catalog(), Clock.systemDefaultZone()).today()`. 전체 40개 중 날짜로 정해지는 무작위 규칙이며, 같은 날은 같은 규칙, 40일 동안 겹치지 않습니다. `another(현재, new Random())`은 "다른 규칙 보기"용입니다. |
+| `service/AuthSessionService` | `AuthService`(login-mypage 브랜치와 동일 파일) 위의 세션 계층. `signUp`, `login`, `logout`, `isLoggedIn`, `currentUser`, `myAttempts`, `addListener`(로그인 상태가 바뀔 때 화면 갱신). |
+
+검사는 `FeatureTeamServicesTest`에 있습니다.
