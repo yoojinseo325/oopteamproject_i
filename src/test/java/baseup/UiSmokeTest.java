@@ -97,6 +97,10 @@ public final class UiSmokeTest {
                 search.setText("수비 인원");JList<?> list=components().stream().filter(JList.class::isInstance).map(JList.class::cast).findFirst().orElseThrow();
                 check(list.getModel().getSize()>=1&&((RuleConcept)list.getModel().getElementAt(0)).id().equals("defense"),"Rule searchable by title");
                 search.setText("보크");check(((RuleConcept)list.getModel().getElementAt(0)).id().equals("balk"),"Undiscovered rule visible in encyclopedia");
+                list.setSelectedIndex(0);
+                check(components().stream().anyMatch(c->"rule-detail".equals(c.getName())),"Rule with its own detail shows it");
+                search.setText("수비 인원");list.setSelectedIndex(0);
+                check(components().stream().noneMatch(c->"rule-detail".equals(c.getName())),"Detail equal to summary is not repeated");
                 search.setText("");list.setSelectedIndex(0);
                 components().stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(x->"page-next".equals(x.getName())).findFirst().orElseThrow().doClick();
                 check(list.getSelectedIndex()==1,"Next page button flips the encyclopedia");

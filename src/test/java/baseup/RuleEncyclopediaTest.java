@@ -40,6 +40,19 @@ public final class RuleEncyclopediaTest {
         check(!TextNormalizer.matchesAny("보크아님", List.of("balk", "보크")), "partial answer rejected");
         check(!TextNormalizer.contains("abc", "  "), "blank query matches nothing");
         check(TextNormalizer.terms(" 2아웃   포스 ").equals(List.of("2아웃", "포스")), "split terms");
+        extraDetail();
+    }
+
+    /** 백과사전이 같은 문장을 두 번 보여 주지 않도록, 요약에 없는 설명만 꺼낸다. */
+    private static void extraDetail() {
+        check(rule("요약입니다.", "요약입니다.").extraDetail().isEmpty(), "same text hidden");
+        check(rule("요약입니다.", " 요약 입니다. ").extraDetail().isEmpty(), "spacing ignored");
+        check(rule("요약입니다.", "요약입니다. 더 자세히.").extraDetail().equals("더 자세히."), "summary prefix removed");
+        check(rule("요약입니다.", "전혀 다른 설명").extraDetail().equals("전혀 다른 설명"), "different detail kept");
+        check(rule("", "설명만").extraDetail().equals("설명만"), "blank summary keeps detail");
+    }
+    private static RuleConcept rule(String summary, String detail) {
+        return new RuleConcept("x", "topic", "제목", summary, detail, "출처", RuleCategory.BASIC, List.of());
     }
 
     private static void tableOfContents(RuleEncyclopedia book) {

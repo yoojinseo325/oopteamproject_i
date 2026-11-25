@@ -206,12 +206,19 @@ public final class RuleLibraryPanel extends JPanel {
         JTextArea summary=paragraph(r.summary(),2);
         summary.setForeground(GREEN);
         Theme.add(info,summary);
-        gap(info,14);
-        Theme.add(info,paragraph(r.detail(),7));
+        String extra=r.extraDetail(); // 요약과 같은 설명은 다시 보여 주지 않는다
+        if(!extra.isEmpty()){
+            gap(info,14);
+            JTextArea detail=paragraph(extra,7);
+            detail.setName("rule-detail");
+            Theme.add(info,detail);
+        }
         gap(info,18);
         long questions=service.questionCount(r.id());
-        Theme.add(info,label(questions==0?"아직 연결된 문제가 없는 규칙입니다."
-                :"독립 해결   "+service.mastery(r.id())+" / "+questions+" 상황",13,GREEN,true));
+        JLabel mastery=label(questions==0?"아직 연결된 문제가 없는 규칙입니다."
+                :"독립 해결   "+service.mastery(r.id())+" / "+questions+" 상황",13,GREEN,true);
+        mastery.setBorder(new EmptyBorder(0,0,0,10)); // 굵은 글꼴 폭을 좁게 재서 끝 글자가 잘리지 않도록 여유를 둔다
+        Theme.add(info,mastery);
         gap(info,12);
         if(!r.keywords().isEmpty()){
             Theme.add(info,label("<html>함께 쓰는 말: "+html(String.join(", ",r.keywords()))+"</html>",12,MUTED,false));
