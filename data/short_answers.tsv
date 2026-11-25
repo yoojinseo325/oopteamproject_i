@@ -1,0 +1,13 @@
+id	answers
+E02	이닝|1이닝|inning
+E04	볼넷|포볼|4구|four ball|base on balls|BB
+E05	포수|캐처|catcher
+E08	동점|동률|타이|tie
+E09	중견수|센터|센터필더|center fielder|CF
+M03	0.300|3할
+M04	0.840
+M05	지명타자|DH|designated hitter
+H03	5와 2/3이닝|5와 2/3|5와 3분의 2이닝|5와 3분의 2|5이닝 2아웃|5이닝과 2아웃
+H05	번트로 떠오른 타구|번트|번트 타구|번트 플라이|뜬 번트|직선타|라인드라이브
+H09	인정하지 않는다|인정 안 함|인정되지 않는다|불인정|득점 불인정|무득점
+H10	사이클링 히트|사이클|히트 포 더 사이클|hitting for the cycle

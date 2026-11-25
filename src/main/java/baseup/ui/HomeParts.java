@@ -52,6 +52,11 @@ final class HomeParts {
             case "person" -> { // 마이페이지
                 g.fill(new Ellipse2D.Double(x + s * .3, y + s * .02, s * .4, s * .4));
                 g.fill(new Arc2D.Double(x + s * .08, y + s * .5, s * .84, s * .9, 0, 180, Arc2D.CHORD)); }
+            case "rulebook" -> { // 규칙 백과사전: 펼친 책(채운 아이콘, 가운데 접힌 선만 비움)
+                Path2D left = new Path2D.Double(); left.moveTo(x + s * .47, y + s * .2); left.curveTo(x + s * .35, y + s * .1, x + s * .15, y + s * .1, x + s * .02, y + s * .16);
+                left.lineTo(x + s * .02, y + s * .9); left.curveTo(x + s * .15, y + s * .84, x + s * .35, y + s * .84, x + s * .47, y + s * .94); left.closePath(); g.fill(left);
+                Path2D right = new Path2D.Double(); right.moveTo(x + s * .53, y + s * .2); right.curveTo(x + s * .65, y + s * .1, x + s * .85, y + s * .1, x + s * .98, y + s * .16);
+                right.lineTo(x + s * .98, y + s * .9); right.curveTo(x + s * .85, y + s * .84, x + s * .65, y + s * .84, x + s * .53, y + s * .94); right.closePath(); g.fill(right); }
             default -> { }
         }
         g.dispose();

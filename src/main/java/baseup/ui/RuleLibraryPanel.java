@@ -6,6 +6,7 @@ import baseup.service.LearningService;
 import baseup.service.RuleEncyclopedia;
 import baseup.service.RuleEncyclopedia.MatchField;
 import baseup.service.RuleEncyclopedia.SearchHit;
+import baseup.ui.Theme.ActionButton;
 import javax.swing.JPanel;
 import javax.swing.JLabel;
 import javax.swing.JComboBox;
@@ -141,7 +142,26 @@ public final class RuleLibraryPanel extends JPanel {
             detail.removeAll();
             RuleConcept r=list.getSelectedValue();
             if(r==null) detail.add(label("<html>검색 결과가 없어요.<br>다른 이름이나 짧은 단어로 검색해 보세요.</html>",14,MUTED,false));
-            else detail.add(scroll(ruleCard(r,related->{
+            else {
+                // 책처럼 넘겨보기(교수님 피드백 6): 지금 목록(분류·검색 결과) 안에서 한 쪽씩 넘긴다. ←/→ 키도 된다.
+                int at=list.getSelectedIndex(), pages=model.size();
+                JPanel pager=new JPanel(new BorderLayout(12,0));
+                pager.setOpaque(false);
+                pager.setBorder(new EmptyBorder(0,0,12,0));
+                ActionButton prev=button("←  이전 쪽",false,()->list.setSelectedIndex(at-1));
+                prev.setEnabled(at>0);
+                prev.setName("page-prev");
+                ActionButton next=button("다음 쪽  →",true,()->list.setSelectedIndex(at+1));
+                next.setEnabled(at<pages-1);
+                next.setName("page-next");
+                JLabel page=label((at+1)+"  /  "+pages+" 쪽   ·   "+r.category().label(),14,MUTED,true);
+                page.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+                pager.add(prev,BorderLayout.WEST);
+                pager.add(page,BorderLayout.CENTER);
+                pager.add(next,BorderLayout.EAST);
+                detail.add(pager,BorderLayout.NORTH);
+            }
+            if(r!=null) detail.add(scroll(ruleCard(r,related->{
                 // 관련 규칙이 현재 목록에 없으면 필터를 풀고 이동한다.
                 if(!model.contains(related)){
                     search.setText("");
@@ -159,6 +179,16 @@ public final class RuleLibraryPanel extends JPanel {
         category.addActionListener(e->filter.run());
         list.addListSelectionListener(e->{
             if(!e.getValueIsAdjusting())render[0].run();
+        });
+        // ←/→ 키로 쪽 넘기기(검색창에 글을 쓰는 중이 아닐 때).
+        javax.swing.InputMap keys=outer.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        keys.put(javax.swing.KeyStroke.getKeyStroke("LEFT"),"page-prev");
+        keys.put(javax.swing.KeyStroke.getKeyStroke("RIGHT"),"page-next");
+        outer.getActionMap().put("page-prev",new javax.swing.AbstractAction(){
+            public void actionPerformed(java.awt.event.ActionEvent e){ if(!search.hasFocus()&&list.getSelectedIndex()>0) list.setSelectedIndex(list.getSelectedIndex()-1); }
+        });
+        outer.getActionMap().put("page-next",new javax.swing.AbstractAction(){
+            public void actionPerformed(java.awt.event.ActionEvent e){ if(!search.hasFocus()&&list.getSelectedIndex()<model.size()-1) list.setSelectedIndex(list.getSelectedIndex()+1); }
         });
         filter.run();
         book.find(initialRuleId==null?"":initialRuleId).ifPresent(r->list.setSelectedValue(r,true));

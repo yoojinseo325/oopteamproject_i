@@ -33,7 +33,7 @@ public final class MissionResultPanel extends JPanel {
         RoundedPanel result=card();
         result.setLayout(new BorderLayout(20,10));
         JPanel words=column();
-        Theme.add(words,label(independent==session.size()?"NICE CALL!":"GOOD PRACTICE!",34,GREEN,true));
+        Theme.add(words,label(independent==session.size()?"NICE CALL!":"GOOD PRACTICE!",34,SUCCESS,true));
         gap(words,16);
         Theme.add(words,label("이해한 문제   "+correct+" / "+session.size(),22,INK,true));
         gap(words,12);
@@ -48,7 +48,7 @@ public final class MissionResultPanel extends JPanel {
             RoundedPanel row=card();
             row.setLayout(new BorderLayout());
             row.add(label(q.title(),15,INK,true),BorderLayout.WEST);
-            row.add(label(a.independent()?"독립 해결 +30 XP까지":a.understood()?"힌트와 함께 이해":"다음 도전에서 이어 연습",13,a.understood()?GREEN:RED,true),BorderLayout.EAST);
+            row.add(label(a.independent()?"독립 해결 +30 XP까지":a.understood()?"힌트와 함께 이해":"다음 도전에서 이어 연습",13,a.understood()?SUCCESS:RED,true),BorderLayout.EAST);
             Theme.add(p,row);
             gap(p,10);
         }

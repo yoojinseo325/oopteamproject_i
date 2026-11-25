@@ -79,7 +79,7 @@ final class TodayRuleCard extends JPanel {
         render();
         // 창 너비가 넓음↔좁음으로 바뀌면 그림·오늘의 콜 크기를 다시 맞춘다
         addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override public void componentResized(java.awt.event.ComponentEvent e) { if (narrow() != wasNarrow || wide() != wasWide) render(); }
+            @Override public void componentResized(java.awt.event.ComponentEvent e) { if (narrow() != wasNarrow || wide() != wasWide) { tallest = 0; render(); } }
         });
     }
 
@@ -110,6 +110,16 @@ final class TodayRuleCard extends JPanel {
         index = (index + 1) % rules.size(); render();
     }
     @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
+    /**
+     * 슬라이드가 자동으로 넘어갈 때 카드 높이가 줄었다 늘었다 하면 아래 타격 게임이 위아래로 밀린다.
+     * 그래서 지금까지 가장 컸던 높이를 유지한다(창 너비가 바뀌어 배치가 달라질 때만 다시 잰다).
+     */
+    private int tallest;
+    @Override public Dimension getPreferredSize() {
+        Dimension d = super.getPreferredSize();
+        tallest = Math.max(tallest, d.height);
+        return new Dimension(d.width, tallest);
+    }
 
     // ---------- 위: 제목 줄 ----------
     private JComponent header() {

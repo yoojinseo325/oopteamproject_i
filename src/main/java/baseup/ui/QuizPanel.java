@@ -56,12 +56,13 @@ public final class QuizPanel extends JPanel {
         JPanel heading=new JPanel(new BorderLayout());
         heading.setOpaque(false);
         JPanel title=column();
-        Theme.add(title,label((session.stepNumber()>0?"STEP "+session.stepNumber()+"   /   ":"CHALLENGE   /   ")+String.format("%02d",session.index()+1)+" / "+String.format("%02d",session.size())+"   ·   "+q.level(),11,GREEN,true));
+        // 큰 글씨에서도 잘리지 않도록 HTML 라벨로 그린다(Swing 라벨은 폭이 부족하면 "…"로 자른다).
+        Theme.add(title,label("<html>"+(session.stepNumber()>0?"STEP "+session.stepNumber()+"&nbsp;&nbsp;/&nbsp;&nbsp;":"CHALLENGE&nbsp;&nbsp;/&nbsp;&nbsp;")+String.format("%02d",session.index()+1)+" / "+String.format("%02d",session.size())+"&nbsp;&nbsp;·&nbsp;&nbsp;"+html(q.level())+"</html>",13,GREEN,true));
         gap(title,8);
-        Theme.add(title,label(q.title(),27,INK,true));
+        Theme.add(title,label(q.title(),30,INK,true));
         heading.add(title,BorderLayout.CENTER);
         heading.add(button("미션 나가기",false,exit),BorderLayout.EAST);
-        heading.setMaximumSize(new Dimension(Integer.MAX_VALUE,65));
+        heading.setMaximumSize(new Dimension(Integer.MAX_VALUE,74));
         Theme.add(page,heading);
         gap(page,17);
         JProgressBar progress=new JProgressBar(0,session.size());
@@ -83,7 +84,7 @@ public final class QuizPanel extends JPanel {
         };
         int current=feedback?steps.length-1:session.stage()==QuizSession.Stage.CLUE?1:0;
         for(int i=0;i<steps.length;i++) {
-            JLabel l=label(steps[i],12,i==current?GREEN:MUTED,i==current);
+            JLabel l=label(steps[i],15,i==current?GREEN:MUTED,i==current);
             l.setBorder(new EmptyBorder(6,0,6,0));
             stages.add(l);
         }
@@ -98,11 +99,11 @@ public final class QuizPanel extends JPanel {
             teams.setMaximumSize(new Dimension(Integer.MAX_VALUE,46));
             Theme.add(page,teams);
             gap(page,6);
-            Theme.add(page,label("KBO 선수와 함께하는 가상 학습 상황",11,MUTED,false));
+            Theme.add(page,label("<html>KBO 선수와 함께하는 가상 학습 상황</html>",14,MUTED,false));
             gap(page,12);
         }
         else {
-            Theme.add(page,label("PICTURE PLAY   /   그림 속 장면에서 판단의 기준을 찾아요",11,MUTED,false));
+            Theme.add(page,label("<html>PICTURE PLAY&nbsp;&nbsp;/&nbsp;&nbsp;그림 속 장면에서 판단의 기준을 찾아요</html>",14,MUTED,false));
             gap(page,12);
         }
         JPanel columns=new JPanel(new GridBagLayout());
@@ -110,10 +111,10 @@ public final class QuizPanel extends JPanel {
         GridBagConstraints c=new GridBagConstraints();
         c.fill=GridBagConstraints.BOTH;
         c.weighty=1;
-        c.weightx=0.56;
+        c.weightx=0.62;
         c.gridx=0;
         c.insets=new Insets(0,0,0,18);
-        int height=q.hasImage()&&q.requiresClue()?600:530;
+        int height=q.hasImage()&&q.requiresClue()?720:640; // 교수님 피드백 7: 그림을 더 크게
         visual = q.hasImage()
         ? new ImageQuestionPanel(service.catalog(),session,this::chooseClue,images,error)
         : new SceneQuestionPanel(service.catalog(),session,this::chooseClue,message);
@@ -121,7 +122,7 @@ public final class QuizPanel extends JPanel {
         visual.setPreferredSize(new Dimension(0,height));
         columns.add(visual,c);
         c.gridx=1;
-        c.weightx=0.44;
+        c.weightx=0.38;
         c.insets=new Insets(0,0,0,0);
         JPanel question;
         if (feedback) {
@@ -143,8 +144,8 @@ public final class QuizPanel extends JPanel {
         JPanel actions=new JPanel(new BorderLayout(18,0));
         actions.setBackground(WHITE);
         actions.setBorder(new EmptyBorder(12,28,12,28));
-        actions.add(label(feedback?"해설을 확인하고 다음 장면으로 가요.":"선택한 뒤 아래 버튼을 눌러주세요.",12,MUTED,false),BorderLayout.CENTER);
-        primaryAction.setPreferredSize(new Dimension(350,48));
+        actions.add(label(feedback?"해설을 확인하고 다음 장면으로 가요.":"선택한 뒤 아래 버튼을 눌러주세요.",14,MUTED,false),BorderLayout.CENTER);
+        primaryAction.setPreferredSize(new Dimension(360,54));
         actions.add(primaryAction,BorderLayout.EAST);
         add(actions,BorderLayout.SOUTH);
         revalidate();
@@ -155,8 +156,8 @@ public final class QuizPanel extends JPanel {
         RoundedPanel badge=new RoundedPanel(color,12);
         badge.setBorder(new EmptyBorder(10,14,10,14));
         badge.setLayout(new BorderLayout());
-        badge.add(label(team.name(),15,contrast(color),true),BorderLayout.WEST);
-        badge.add(label(role,12,contrast(color),true),BorderLayout.EAST);
+        badge.add(label(team.name(),17,contrast(color),true),BorderLayout.WEST);
+        badge.add(label(role,14,contrast(color),true),BorderLayout.EAST);
         return badge;
     }
 

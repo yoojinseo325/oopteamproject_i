@@ -30,7 +30,32 @@ public final class FeatureTeamServicesTest {
         progress(catalog);
         dailyRule(catalog);
         authSession(catalog);
-        System.out.println("PASS: " + checks + " progress/daily-rule/auth-session checks");
+        dashboard(catalog);
+        System.out.println("PASS: " + checks + " progress/daily-rule/auth-session/dashboard checks");
+    }
+
+    /** 기능 4: 마이페이지 정답률(누적·난이도별·최근). */
+    private static void dashboard(Catalog catalog) throws Exception {
+        LearningService s = new LearningService(catalog, Files.createTempDirectory(Path.of("build"), "dashboard-test-"));
+        LearningStatistics empty = s.statistics();
+        check(empty.accuracy().equals(new LearningStatistics.Accuracy(0, 0)) && empty.accuracy().percent() == 0, "no attempts");
+        check(empty.accuracyByLevel().keySet().stream().toList().equals(List.of("입문", "기본", "심화", "응용")), "level order: " + empty.accuracyByLevel().keySet());
+        check(empty.accuracyByLevel().values().stream().allMatch(a -> a.label().equals("기록 없음")), "empty levels shown");
+        Question e1 = catalog.question("E01").orElseThrow(), e3 = catalog.question("E03").orElseThrow(), m1 = catalog.question("M01").orElseThrow();
+        answer(s, e1);
+        answer(s, m1);
+        QuizSession wrong = s.start(x -> List.of(e3));
+        wrong.choose(e3.answer() == 0 ? 1 : 0);
+        if (e3.requiresClue()) { wrong.beginClue(); wrong.chooseClue(e3.clueTarget()); }
+        s.submit(wrong);
+        LearningStatistics stats = s.statistics();
+        check(stats.accuracy().equals(new LearningStatistics.Accuracy(2, 3)) && stats.accuracy().wrong() == 1, "overall " + stats.accuracy());
+        check(stats.accuracy().percent() == 67 && stats.accuracy().label().equals("67%  (2/3)"), "rounded percent");
+        check(stats.accuracyByLevel().get("입문").equals(new LearningStatistics.Accuracy(1, 2)), "beginner level");
+        check(stats.accuracyByLevel().get("기본").equals(new LearningStatistics.Accuracy(1, 1)), "basic level");
+        check(stats.accuracyByLevel().get("심화").total() == 0, "untouched level");
+        check(stats.recentAccuracy(1).equals(new LearningStatistics.Accuracy(0, 1)), "latest attempt was wrong");
+        check(stats.recentAccuracy(10).total() == 3 && stats.recentAccuracy(0).total() == 0, "recent window");
     }
 
     private static void gauge() throws Exception {

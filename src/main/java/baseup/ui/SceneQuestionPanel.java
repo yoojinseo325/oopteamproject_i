@@ -7,6 +7,7 @@ import baseup.repository.Catalog;
 import javax.swing.JPanel;
 import javax.swing.JLabel;
 import javax.swing.JTextArea;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -30,6 +31,12 @@ final class SceneQuestionPanel extends QuestionVisual {
     private JLabel caption;
     private ActionButton first;
     private ActionButton second;
+    private ActionButton play;
+    private Timer player;
+    private Timer autoplay;
+    private static final int PLAY_MILLIS = 2600;
+    /** 이미 자동 재생한 문제(세션+순번). 화면을 다시 그려도 같은 문제에서 또 재생하지 않는다. */
+    private static final java.util.Set<String> AUTOPLAYED = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
     SceneQuestionPanel(Catalog catalog, QuizSession session, Consumer<String> onClue, Consumer<String> message) {
         this.catalog = catalog;
@@ -46,15 +53,20 @@ final class SceneQuestionPanel extends QuestionVisual {
         card.setBorder(new EmptyBorder(20,20,20,20));
         card.setLayout(new BorderLayout(0,12));
         JPanel top=column();
-        Theme.add(top,label("FIELD VIEW   /   장면을 관찰하세요",11,GREEN,true));
+        Theme.add(top,label("<html>FIELD VIEW&nbsp;&nbsp;/&nbsp;&nbsp;▶ 재생을 누르면 장면이 영상처럼 움직여요</html>",13,GREEN,true));
         gap(top,14);
-        JPanel toggle=new JPanel(new GridLayout(1,2,8,0));
+        JPanel toggle=new JPanel(new GridLayout(1,3,8,0));
         toggle.setOpaque(false);
         first=button("장면 1 · 상황 시작",false,()->setScene(true));
         second=button("장면 2 · 판정 순간",false,()->setScene(false));
         first.setName("before");
         second.setName("after");
+        play=button("▶  장면 재생",true,this::play);
+        play.setName("play");
+        // 단서를 고르는 동안에는 판정 순간(장면 2)을 미리 보여 주지 않는다.
+        play.setEnabled(session.stage()!=QuizSession.Stage.CLUE);
         toggle.add(first);
+        toggle.add(play);
         toggle.add(second);
         Theme.add(top,toggle);
         card.add(top,BorderLayout.NORTH);
@@ -75,22 +87,22 @@ final class SceneQuestionPanel extends QuestionVisual {
         JPanel middle=new JPanel(new BorderLayout(0,10));
         middle.setOpaque(false);
         middle.add(field,BorderLayout.CENTER);
-        caption=label("<html>"+html(catalog.scene(before?q.beforeScene():q.afterScene()).caption())+"</html>",12,MUTED,false);
+        caption=label("<html>"+html(catalog.scene(before?q.beforeScene():q.afterScene()).caption())+"</html>",14,MUTED,false);
         caption.setPreferredSize(new Dimension(300,45));
         middle.add(caption,BorderLayout.SOUTH);
         card.add(middle,BorderLayout.CENTER);
         JPanel bottom=column();
-        Theme.add(bottom,label("R 공격 · D 수비  /  선수 색상 = 소속 구단  /  ! 상황 정보",11,MUTED,false));
+        Theme.add(bottom,label("R 공격 · D 수비  /  선수 색상 = 소속 구단  /  ! 상황 정보",13,MUTED,false));
         gap(bottom,15);
         if(session.stage()==QuizSession.Stage.CLUE) {
-            Theme.add(bottom,label("그림 속 대상을 클릭하거나 아래에서 선택하세요.",12,GREEN,true));
+            Theme.add(bottom,label("그림 속 대상을 클릭하거나 아래에서 선택하세요.",14,GREEN,true));
             gap(bottom,9);
             JPanel options=new JPanel(new GridLayout(0,2,7,7));
             options.setOpaque(false);
             for(Scene.Token token:catalog.scene(q.beforeScene()).tokens()) {
                 String copy=token.player()==null?html(token.label()):html(token.player().displayName())+"<br>"+html(token.label());
                 ActionButton b=button("<html><center>"+copy+"</center></html>",false,()->onClue.accept(token.id()));
-                b.setFont(font(11,true));
+                b.setFont(font(13,true));
                 b.setBorder(new EmptyBorder(8,5,8,5));
                 b.setName("clue-"+token.id());
                 b.getAccessibleContext().setAccessibleName(token.displayLabel());
@@ -106,7 +118,7 @@ final class SceneQuestionPanel extends QuestionVisual {
             RoundedPanel note=new RoundedPanel(PALE,12);
             note.setLayout(new BorderLayout());
             note.setBorder(new EmptyBorder(14,14,14,14));
-            JTextArea copy=text(session.stage()==QuizSession.Stage.FEEDBACK?"노란 테두리의 단서가 판정을 바꿉니다. 장면을 바꾸며 조건을 비교해 보세요.":"장면 1과 장면 2를 번갈아 보세요. 그림은 상황을 단순화한 도식이며, 공의 보유·접촉 시점은 오른쪽 설명을 함께 확인해요.",12,MUTED);
+            JTextArea copy=text(session.stage()==QuizSession.Stage.FEEDBACK?"노란 테두리의 단서가 판정을 바꿉니다. 장면을 바꾸며 조건을 비교해 보세요.":"장면 1과 장면 2를 번갈아 보세요. 그림은 상황을 단순화한 도식이며, 공의 보유·접촉 시점은 오른쪽 설명을 함께 확인해요.",14,MUTED);
             copy.setRows(3);
             note.add(copy);
             Theme.add(bottom,note);
@@ -116,6 +128,7 @@ final class SceneQuestionPanel extends QuestionVisual {
     }
 
     private void setScene(boolean showBefore) {
+        if(player!=null) stopPlayback();
         if(session.stage()==QuizSession.Stage.CLUE && !showBefore) {
             message.accept("단서는 장면 1에서 찾아주세요. 판정 순간은 단서 제출 후 다시 볼 수 있어요.");
             return;
@@ -128,6 +141,55 @@ final class SceneQuestionPanel extends QuestionVisual {
         first.mark(before);
         second.mark(!before);
         caption.setText("<html>"+html(scene.caption())+"</html>");
+    }
+
+    /**
+     * 시나리오 재생(교수님 피드백 9): 장면 1에서 장면 2로 선수와 공이 움직이는 모습을 2.6초 동안 보여 준다.
+     * 영상 파일 없이 scenes.tsv의 두 장면 좌표를 Scene.between으로 이어 그린다.
+     */
+    private void play() {
+        if(session.stage()==QuizSession.Stage.CLUE) return;
+        stopPlayback();
+        Question q=session.current();
+        Scene from=catalog.scene(q.beforeScene()), to=catalog.scene(q.afterScene());
+        long start=System.currentTimeMillis();
+        first.mark(false);
+        second.mark(false);
+        play.setText("■  재생 중…");
+        player=new Timer(33,e->{
+            double progress=(System.currentTimeMillis()-start)/(double)PLAY_MILLIS;
+            Scene frame=Scene.between(from,to,progress);
+            field.scene(frame);
+            caption.setText("<html>"+html(frame.caption())+"</html>");
+            if(progress>=1) {
+                stopPlayback();
+                setScene(false);
+            }
+        });
+        player.start();
+    }
+
+    private void stopPlayback() {
+        if(player!=null) player.stop();
+        player=null;
+        if(play!=null) play.setText("▶  다시 재생");
+    }
+
+    @Override public void addNotify() {
+        super.addNotify();
+        // 판정 단계에서 문제를 처음 열면 한 번 자동 재생한다. 끄려면 -Dbaseup.autoplay=off.
+        String key=System.identityHashCode(session)+":"+session.index();
+        if(session.stage()==QuizSession.Stage.JUDGE && !"off".equals(System.getProperty("baseup.autoplay")) && AUTOPLAYED.add(key)) {
+            autoplay=new Timer(700,e->play());
+            autoplay.setRepeats(false);
+            autoplay.start();
+        }
+    }
+
+    @Override public void removeNotify() {
+        if(autoplay!=null) autoplay.stop();
+        stopPlayback();
+        super.removeNotify();
     }
 
     @Override void selectClue(String id) {

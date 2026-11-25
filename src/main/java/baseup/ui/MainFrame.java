@@ -105,7 +105,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
         teamCard.setMaximumSize(new Dimension(Integer.MAX_VALUE,teamCard.getPreferredSize().height));Theme.add(body,teamCard);gap(body,22);
         Theme.add(body,label("   MY CLUBHOUSE",11,new Color(255,255,255,190),true)); gap(body,8);
         String[][] menus={{"home","메인 홈","home"},{"missions","규칙 학습","mitt"},{"quiz","퀴즈","camera"},
-                {"library","규칙 백과사전","book"},{"mypage","마이페이지","person"}};
+                {"library","규칙 백과사전","rulebook"},{"mypage","마이페이지","person"}};
         navigation.clear();
         for(String[] menu:menus) {
             Sidebar.NavButton b=new Sidebar.NavButton(menu[1],menu[2]);
@@ -206,7 +206,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
         int independent=(int)session.results().stream().filter(Attempt::independent).count();
         JPanel p=Screen.page("MISSION COMPLETE","판정 하나만큼, 성장했어요.",session.stepNumber()>0?"STEP "+session.stepNumber()+" 완료 · "+(service.courseComplete()?"모든 단계를 완주했어요!":"다음 단계가 열렸어요."):"새로운 상황에서도 판단의 기준을 떠올려 보세요.");
         RoundedPanel result=card();result.setLayout(new BorderLayout(20,10));
-        JPanel words=column();Theme.add(words,label(independent==session.size()?"NICE CALL!":"GOOD PRACTICE!",34,GREEN,true));gap(words,16);
+        JPanel words=column();Theme.add(words,label(independent==session.size()?"NICE CALL!":"GOOD PRACTICE!",34,SUCCESS,true));gap(words,16);
         Theme.add(words,label("이해한 문제   "+correct+" / "+session.size(),22,INK,true));gap(words,12);
         Theme.add(words,label("힌트 없이 해결한 상황   "+independent+"개",15,MUTED,false));gap(words,12);
         Theme.add(words,Screen.paragraph("헷갈렸던 판단은 다음 도전의 다른 상황 속에서 다시 만나요.\n익숙해진 판단은 간격을 두고 돌아옵니다. 따로 정리할 숙제는 없어요.",2));
@@ -214,7 +214,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
         for(Attempt a:session.results()) {
             Question q=service.catalog().question(a.questionId()).orElseThrow();
             RoundedPanel row=card();row.setLayout(new BorderLayout());row.add(label(q.title(),15,INK,true),BorderLayout.WEST);
-            row.add(label(a.independent()?"독립 해결 +30 XP까지":a.understood()?"힌트와 함께 이해":"다음 도전에서 이어 연습",13,a.understood()?GREEN:RED,true),BorderLayout.EAST);
+            row.add(label(a.independent()?"독립 해결 +30 XP까지":a.understood()?"힌트와 함께 이해":"다음 도전에서 이어 연습",13,a.understood()?SUCCESS:RED,true),BorderLayout.EAST);
             Theme.add(p,row);gap(p,10);
         }
         JPanel actions=row(12);actions.add(button(nextAction(),true,()->{session=null;startNext();}));

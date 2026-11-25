@@ -116,7 +116,12 @@ final class HomeScreen extends Screen {
         find.add(findTitle,BorderLayout.NORTH);
         RuleSearchBox search=new RuleSearchBox(service,app::openRule);find.add(search,BorderLayout.CENTER);
         find.setMaximumSize(new Dimension(Integer.MAX_VALUE,Integer.MAX_VALUE));Theme.add(p,find);
-        JScrollPane sc=scroll(p); sc.setOpaque(false); sc.getViewport().setOpaque(false);
+        JScrollPane sc=scroll(p); sc.setOpaque(false);
+        // 타격 게임 중 화면이 갑자기 맨 위로 튀지 않게: 포커스·글자 변경이 보내는 자동 스크롤 요청(scrollRectToVisible)을 무시하고,
+        // 사용자가 직접 굴린 스크롤(휠·스크롤바)만 따른다.
+        JViewport stable=new JViewport(){ @Override public void scrollRectToVisible(Rectangle r){ } };
+        stable.setView(sc.getViewport().getView()); stable.setOpaque(false); stable.setBackground(sc.getViewport().getBackground());
+        sc.setViewport(stable);
         stadium.add(sc,BorderLayout.CENTER);
         return stadium;
     }

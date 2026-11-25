@@ -2,6 +2,7 @@ package baseup.repository;
 
 import baseup.model.*;
 import baseup.common.Manager;
+import baseup.common.TextNormalizer;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -16,6 +17,8 @@ public final class Catalog {
     private final Manager<Matchup> matchups;
     private final Path data;
     private final List<LearningStep> steps;
+    /** 단답형 문제 ID → 허용 답안(동의어 포함). data/short_answers.tsv가 없으면 비어 있다. */
+    private final Map<String, List<String>> shortAnswers;
     public Catalog(Path data) throws IOException {
         this.data = data.toAbsolutePath().normalize();
         for (String name : List.of("rules.tsv", "questions.tsv", "scenes.tsv", "teams.tsv", "players.tsv", "matchups.tsv", "image_questions.tsv", "steps.tsv"))
@@ -62,9 +65,16 @@ public final class Catalog {
                 f -> new StepRow(f[0], f[1], List.of(f[2].split("\\|", -1))), x -> "").load())
             loaded.add(new LearningStep(loaded.size() + 1, Integer.parseInt(row.id()), row.goal(), row.questions()));
         steps = List.copyOf(loaded);
+        Map<String, List<String>> typed = new LinkedHashMap<>();
+        // 선택 파일: 객관식 문제 중 일부를 직접 입력해서 답하는 단답형으로 바꾼다(교수님 피드백 8).
+        for (ShortAnswerRow row : new FileRepository<ShortAnswerRow>(data.resolve("short_answers.tsv"), "id\tanswers",
+                f -> new ShortAnswerRow(f[0], List.of(f[1].split("\\|", -1))), x -> "").load())
+            typed.put(row.id(), row.answers());
+        shortAnswers = Collections.unmodifiableMap(typed);
         validate();
     }
     private record StepRow(String id, String goal, List<String> questions) implements Identifiable { }
+    private record ShortAnswerRow(String id, List<String> answers) implements Identifiable { }
     private static int rgb(String text) {
         if (!text.matches("#[0-9a-fA-F]{6}")) throw new IllegalArgumentException("색상은 #RRGGBB 형식이어야 합니다.");
         return Integer.parseInt(text.substring(1),16);
@@ -125,6 +135,17 @@ public final class Catalog {
                 if (questions.find(id).isEmpty() || !assigned.add(id)) throw new IOException("STEP 문제 누락/중복: " + id);
         }
         if (assigned.size() != questions.all().size()) throw new IOException("모든 문제를 STEP에 한 번씩 배정해 주세요.");
+        for (var entry : shortAnswers.entrySet()) {
+            Question q = questions.find(entry.getKey()).orElseThrow(() -> new IOException("단답형 문제 ID 오류: " + entry.getKey()));
+            List<String> accepted = entry.getValue();
+            if (accepted.stream().anyMatch(String::isBlank)) throw new IOException("단답형 허용 답안이 비어 있습니다: " + q.id());
+            // 정답 선택지는 허용해야 하고, 오답 선택지는 허용하면 안 된다. 그래야 기존 정답 번호로 채점·기록할 수 있다.
+            if (!TextNormalizer.matchesAny(q.choices().get(q.answer()), accepted))
+                throw new IOException("단답형 허용 답안에 정답 선택지가 없습니다: " + q.id());
+            for (int i = 0; i < q.choices().size(); i++)
+                if (i != q.answer() && TextNormalizer.matchesAny(q.choices().get(i), accepted))
+                    throw new IOException("단답형 허용 답안에 오답 선택지가 들어 있습니다: " + q.id());
+        }
     }
     public List<LearningStep> steps() { return steps; }
     public Path imagePath(Question q) throws IOException {
@@ -139,6 +160,9 @@ public final class Catalog {
                 .map(t -> new Question.Clue(t.id(), t.displayLabel())).toList();
     }
     public List<Team> teams() { return teams.all(); }
+    /** 단답형이면 허용 답안 목록, 아니면 빈 목록. */
+    public List<String> shortAnswers(String questionId) { return shortAnswers.getOrDefault(questionId, List.of()); }
+    public boolean isShortAnswer(Question q) { return shortAnswers.containsKey(q.id()); }
     public List<Player> players() { return players.all(); }
     public Matchup matchup(String questionId) { return matchups.find(questionId).orElseThrow(); }
     public List<RuleConcept> rules() { return rules.all(); }

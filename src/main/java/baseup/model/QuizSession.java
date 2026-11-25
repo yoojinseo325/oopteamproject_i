@@ -16,6 +16,7 @@ public final class QuizSession {
     private int index;
     private int choice = -1;
     private String clue = "";
+    private String typed = "";
     private boolean hint;
     private Instant started;
     private Stage stage = Stage.JUDGE;
@@ -47,6 +48,19 @@ public final class QuizSession {
         if (value < 0 || value >= current().choices().size()) throw new IllegalArgumentException("판정을 선택해 주세요.");
         choice = value;
     }
+    /**
+     * 단답형: 입력한 글자와, 채점 결과를 기존 정답 번호 체계로 옮긴 선택지 번호를 함께 기록한다.
+     * 기록·통계는 선택지 번호로 처리하고, 해설 화면은 입력한 글자를 보여 준다.
+     */
+    public void answerText(String text, int mappedChoice) {
+        if (text == null || text.isBlank()) throw new IllegalArgumentException("답을 입력해 주세요.");
+        choose(mappedChoice);
+        typed = text.strip();
+    }
+    /** 단답형으로 입력한 답. 객관식이면 빈 문자열. */
+    public String typedAnswer() { return typed; }
+    /** 입력을 모두 지웠을 때: 아직 답하지 않은 상태로 되돌린다. */
+    public void clearAnswer() { require(Stage.JUDGE); choice = -1; typed = ""; }
     public void beginClue() {
         require(Stage.JUDGE);
         if (choice < 0) throw new IllegalStateException("먼저 판정을 선택해 주세요.");
@@ -65,7 +79,7 @@ public final class QuizSession {
     public void next() {
         require(Stage.FEEDBACK);
         if (index + 1 == size()) { stage = Stage.COMPLETE; return; }
-        index++; choice = -1; clue = ""; hint = false;
+        index++; choice = -1; clue = ""; typed = ""; hint = false;
         started = clock.instant(); stage = Stage.JUDGE;
     }
     private void require(Stage expected) {

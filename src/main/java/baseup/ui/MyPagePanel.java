@@ -2,6 +2,7 @@ package baseup.ui;
 
 import baseup.model.*;
 import baseup.service.LearningService;
+import baseup.service.LearningStatistics;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
@@ -48,7 +49,8 @@ public final class MyPagePanel extends JPanel {
         Theme.add(body,label("내 학습 기록과 즐겨찾기 메모를 한곳에서 확인하세요.",14,MUTED,false)); gap(body,25);
         Theme.add(body,topCards()); gap(body,20);
         Theme.add(body,label("학습 현황",21,INK,true)); gap(body,13);
-        Theme.add(body,statistics()); gap(body,22);
+        Theme.add(body,statistics()); gap(body,14);
+        Theme.add(body,accuracy()); gap(body,22);
         Theme.add(body,label("나의 학습 공간",21,INK,true)); gap(body,5);
         Theme.add(body,label("최근 진행한 내용으로 빠르게 돌아갈 수 있어요.",13,MUTED,false)); gap(body,15);
         Theme.add(body,quickLinks());
@@ -227,6 +229,54 @@ public final class MyPagePanel extends JPanel {
         out.add(surface,BorderLayout.CENTER);
         out.setPreferredSize(new Dimension(960,141));out.setMaximumSize(new Dimension(Integer.MAX_VALUE,141));
         return out;
+    }
+
+    /** 정답·오답 누적과 난이도별 정답률(기능 4 대시보드). */
+    private JPanel accuracy() {
+        LearningStatistics stats=service.statistics();
+        LearningStatistics.Accuracy total=stats.accuracy(), recent=stats.recentAccuracy(10);
+        DashboardStyle.Surface surface=new DashboardStyle.Surface(WHITE,22);
+        surface.setName("accuracy-dashboard");
+        surface.setLayout(new BorderLayout(28,0));
+        surface.setBorder(new EmptyBorder(18,24,18,24));
+        JPanel summary=column();
+        Theme.add(summary,label("정답률",15,INK,true));gap(summary,8);
+        Theme.add(summary,label(total.total()==0?"—":total.percent()+"%",29,DashboardStyle.DEEP,true));gap(summary,8);
+        JLabel counts=label("정답 "+total.correct()+"개 / 오답 "+total.wrong()+"개",13,MUTED,false);
+        counts.setBorder(new EmptyBorder(0,0,0,10)); // 가운뎃점 폭을 좁게 재는 글꼴이 있어 끝 글자가 잘리지 않게 여유를 둔다
+        Theme.add(summary,counts);gap(summary,5);
+        Theme.add(summary,label("최근 "+recent.total()+"문제 "+(recent.total()==0?"—":recent.percent()+"%"),13,MUTED,false));
+        Dimension s=summary.getPreferredSize();
+        summary.setPreferredSize(new Dimension(Math.max(230,s.width),s.height));
+        surface.add(summary,BorderLayout.WEST);
+        JPanel levels=new JPanel(new GridLayout(0,1,0,8));levels.setOpaque(false);
+        stats.accuracyByLevel().forEach((level,a)->levels.add(levelRow(level,a)));
+        surface.add(levels,BorderLayout.CENTER);
+        int h=40+Math.max(s.height,levels.getPreferredSize().height);
+        surface.setPreferredSize(new Dimension(960,h));
+        surface.setMaximumSize(new Dimension(Integer.MAX_VALUE,h));
+        return surface;
+    }
+    private JPanel levelRow(String level,LearningStatistics.Accuracy a) {
+        JPanel row=new JPanel(new BorderLayout(12,0));row.setOpaque(false);
+        JLabel name=label(level,14,INK,true);name.setPreferredSize(new Dimension(44,22));
+        row.add(name,BorderLayout.WEST);
+        JComponent bar=new JComponent(){
+            @Override protected void paintComponent(Graphics g){
+                Graphics2D g2=(Graphics2D)g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+                int y=getHeight()/2-5;
+                g2.setColor(PALE);g2.fillRoundRect(0,y,getWidth(),10,10,10);
+                if(a.total()>0){g2.setColor(ACCENT);g2.fillRoundRect(0,y,Math.max(10,getWidth()*a.percent()/100),10,10,10);}
+                g2.dispose();
+            }
+        };
+        bar.setPreferredSize(new Dimension(200,22));
+        row.add(bar,BorderLayout.CENTER);
+        JLabel value=label(a.label(),13,a.total()==0?MUTED:INK,a.total()>0);
+        value.setPreferredSize(new Dimension(118,22));
+        row.add(value,BorderLayout.EAST);
+        return row;
     }
 
     private JComponent divider() {

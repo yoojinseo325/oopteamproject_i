@@ -56,7 +56,13 @@ public final class UiSmokeTest {
         });
     }
     private static void answer(QuizSession session) throws Exception {
-        Question q=session.current();edt(()->named("choice-"+q.answer()));
+        Question q=session.current();
+        if(service.catalog().isShortAnswer(q)) edt(()->{
+            JTextField typed=components().stream().filter(JTextField.class::isInstance).map(JTextField.class::cast).filter(f->"short-answer".equals(f.getName())).findFirst().orElseThrow(()->new AssertionError("Missing short-answer field "+q.id()));
+            check(components().stream().filter(JButton.class::isInstance).noneMatch(x->"choice-0".equals(x.getName())),"Short answer hides choices "+q.id());
+            typed.setText(" "+service.catalog().shortAnswers(q.id()).get(service.catalog().shortAnswers(q.id()).size()-1).toUpperCase()+" ");
+        });
+        else edt(()->named("choice-"+q.answer()));
         if(q.requiresClue()) {
             edt(()->click("판정 선택 완료 · 단서 찾기   →"));
             edt(()->named("clue-"+q.clueTarget()));edt(()->click("판정과 단서 제출하기   →"));
@@ -64,10 +70,19 @@ public final class UiSmokeTest {
         check(session.stage()==QuizSession.Stage.FEEDBACK,"Feedback reached");
     }
     public static void main(String[] args) throws Exception {
-        Files.createDirectories(images);Theme.install();
+        System.setProperty("baseup.autoplay","off");Files.createDirectories(images);Theme.install();
         service=new LearningService(new Catalog(Path.of("data")),Files.createTempDirectory(Path.of("build"),"ui-test-"));
         try {
             edt(()->{frame=new MainFrame(service);frame.setSize(1360,940);frame.addNotify();frame.validate();});snapshot("01-home");
+            edt(()->{
+                // 홈에서 게임 쪽으로 내려간 뒤 자동 스크롤 요청이 와도 위치가 유지되어야 한다(화면이 맨 위로 튀는 문제).
+                JViewport home=components().stream().filter(JViewport.class::isInstance).map(JViewport.class::cast)
+                        .filter(v->v.getView()!=null&&v.getView().getPreferredSize().height>v.getExtentSize().height+400).findFirst().orElseThrow();
+                home.setViewPosition(new Point(0,400));
+                ((JComponent)home.getView()).scrollRectToVisible(new Rectangle(0,0,10,10));
+                check(home.getViewPosition().y==400,"Home keeps scroll position during play");
+                home.setViewPosition(new Point(0,0));
+            });
             edt(()->{
                 check(components().stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(b->b.getName()!=null&&b.getName().startsWith("lesson-")).count()==3,"home shows 3 next lessons");
                 check(components().stream().filter(JLabel.class::isInstance).map(JLabel.class::cast).noneMatch(l->l.getText().contains("포스")||l.getText().contains("태그업")),"Future content hidden");
@@ -82,6 +97,9 @@ public final class UiSmokeTest {
                 search.setText("수비 인원");JList<?> list=components().stream().filter(JList.class::isInstance).map(JList.class::cast).findFirst().orElseThrow();
                 check(list.getModel().getSize()>=1&&((RuleConcept)list.getModel().getElementAt(0)).id().equals("defense"),"Rule searchable by title");
                 search.setText("보크");check(((RuleConcept)list.getModel().getElementAt(0)).id().equals("balk"),"Undiscovered rule visible in encyclopedia");
+                search.setText("");list.setSelectedIndex(0);
+                components().stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(x->"page-next".equals(x.getName())).findFirst().orElseThrow().doClick();
+                check(list.getSelectedIndex()==1,"Next page button flips the encyclopedia");
                 search.setText("no-result-12345");check(list.getModel().getSize()==0,"Empty search");search.setText("수비 인원");click("북마크에 추가");
             });check(service.bookmarked("defense"),"Image rule bookmark persisted");
             service.addNote("defense","투수와 포수도 수비 인원에 포함된다.");page("notes");snapshot("10-notes");
@@ -98,7 +116,7 @@ public final class UiSmokeTest {
                                 .anyMatch(l -> firstCaption.equals(l.getText())), "Scene 1 is shown first: " + q.id());
                     }
                 });
-                if(List.of("Q01","U08","H02").contains(q.id()))snapshot("integrated-"+q.id());
+                if(List.of("Q01","U08","H02","E09").contains(q.id()))snapshot("integrated-"+q.id());
                 if(q.requiresClue()) {
                     edt(()->named("choice-"+q.answer()));edt(()->click("판정 선택 완료 · 단서 찾기   →"));
                     if(List.of("Q01","U08").contains(q.id()))snapshot("clue-"+q.id());
@@ -126,6 +144,11 @@ public final class UiSmokeTest {
                 JTable table=components().stream().filter(JTable.class::isInstance).map(JTable.class::cast).findFirst().orElseThrow();
                 boolean na=false;for(int row=0;row<table.getRowCount();row++)na|="해당 없음".equals(table.getValueAt(row,3));
                 check(na,"Concept records do not invent clue success");
+            });
+            page("mypage");snapshot("09-mypage");
+            edt(()->{
+                check(components().stream().anyMatch(c->"accuracy-dashboard".equals(c.getName())),"Mypage shows accuracy dashboard");
+                check(components().stream().filter(JLabel.class::isInstance).map(c->((JLabel)c).getText()).anyMatch("심화"::equals),"Mypage shows level accuracy");
             });
             page("home");edt(()->frame.setSize(1100,760));snapshot("11-home-small");
             for(String id:List.of("E01","Q01","U08","H02")) {

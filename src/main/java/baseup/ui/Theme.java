@@ -7,10 +7,17 @@ import java.awt.event.*;
 
 /** 외부 UI 라이브러리 없이 공통 색, 글꼴, 컴포넌트를 정의한다. */
 public final class Theme {
-    public static final Color BG = new Color(0xF4F6F3), WHITE = Color.WHITE, INK = new Color(0x162D2A),
-            MUTED = new Color(0x697975), GREEN = new Color(0x176B50), PALE = new Color(0xE8F3EC),
-            LINE = new Color(0xDCE5DE), NAVY = new Color(0x132E2B), ORANGE = new Color(0xE8A44F),
-            RED = new Color(0xB44E3C);
+    // 메인 홈(야구장 전광판) 팔레트로 통일: 남색 전광판 + 빨간 행동 버튼 + 노란 램프.
+    public static final Color BG = new Color(0xF3F5F8), WHITE = Color.WHITE, INK = new Color(0x111827),
+            MUTED = new Color(0x5B6678), PALE = new Color(0xE8EEF6),
+            LINE = new Color(0xDDE3EB), NAVY = new Color(0x0D1B2A), ORANGE = new Color(0xFFC94A),
+            RED = new Color(0xB3261E);
+    /** 강조 글자·배지·선택 표시 색(남색). 예전 이름 GREEN을 많은 화면이 쓰므로 이름은 유지한다. */
+    public static final Color ACCENT = new Color(0x1E3A5F), GREEN = ACCENT;
+    /** 주요 행동 버튼 색. 메인 홈의 "규칙 카드 보기" 버튼과 같은 빨강. */
+    public static final Color ACTION = new Color(0xD7263D);
+    /** 정답·완료 표시 색. 강조색(남색)과 오답(빨강)과 구분된다. */
+    public static final Color SUCCESS = new Color(0x1F8A4C);
     private Theme() { }
     /** data/fonts 폴더에 KBO 다이아고딕(.ttf/.otf)이 있으면 그 글꼴을, 없으면 맑은 고딕을 쓴다. */
     private static final Font KBO_BOLD = loadFont("bold"), KBO_TEXT = loadFont("light") != null ? loadFont("light") : loadFont("medium");
@@ -118,19 +125,30 @@ public final class Theme {
             });
         }
         public void mark(boolean value) { selected = value; repaint(); }
+        /** 메인 홈 버튼과 같은 알약 모양. 주요 버튼은 빨강(팀 색이 있으면 팀 색), 보조 버튼은 흰 바탕 + 테두리. */
         @Override protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             boolean fill = primary || selected;
-            Color accent = teamColor == null ? GREEN : teamColor;
+            Color accent = teamColor != null ? teamColor : primary ? ACTION : ACCENT;
             Color bg = !isEnabled() ? LINE : fill ? accent : WHITE;
-            if (getModel().isRollover() && isEnabled()) bg = fill ? accent : PALE;
-            g.setColor(bg); g.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 12, 12);
-            g.setColor(hasFocus() ? ORANGE : fill || teamColor != null ? accent : LINE);
-            g.setStroke(new BasicStroke(hasFocus() ? 3 : 1));
-            g.drawRoundRect(1, 1, getWidth()-3, getHeight()-3, 12, 12); g.dispose();
+            boolean hover = getModel().isRollover() && isEnabled();
+            if (hover) bg = fill ? mix(accent, Color.BLACK, .15) : PALE;
+            int w = getWidth(), h = getHeight(), arc = Math.min(h, 40);
+            if (fill && isEnabled()) { g.setColor(new Color(0, 0, 0, 40)); g.fillRoundRect(0, 3, w - 1, h - 4, arc, arc); }
+            g.setColor(bg); g.fillRoundRect(0, 0, w - 1, h - (fill && isEnabled() ? 3 : 1), arc, arc);
+            if (!fill || hasFocus()) {
+                g.setColor(hasFocus() ? ORANGE : teamColor != null ? accent : LINE);
+                g.setStroke(new BasicStroke(hasFocus() ? 3 : 1));
+                g.drawRoundRect(1, 1, w - 3, h - (fill ? 5 : 3), arc, arc);
+            }
+            g.dispose();
             setForeground(!isEnabled() ? MUTED : fill ? contrast(bg) : INK);
             super.paintComponent(graphics);
+        }
+        private static Color mix(Color a, Color b, double t) {
+            return new Color((int) (a.getRed() * (1 - t) + b.getRed() * t), (int) (a.getGreen() * (1 - t) + b.getGreen() * t),
+                    (int) (a.getBlue() * (1 - t) + b.getBlue() * t));
         }
     }
 }

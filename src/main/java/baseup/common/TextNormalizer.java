@@ -1,6 +1,8 @@
 package baseup.common;
 
+import java.math.BigDecimal;
 import java.text.Normalizer;
+import java.util.regex.Pattern;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -37,7 +39,29 @@ public final class TextNormalizer {
 
     /** 입력이 허용 답안(동의어 포함) 중 하나와 같은지. 단답형 채점에 쓸 수 있다. */
     public static boolean matchesAny(String input, Collection<String> accepted) {
-        return accepted.stream().anyMatch(answer -> sameText(input, answer));
+        return accepted.stream().anyMatch(answer -> sameAnswer(input, answer));
+    }
+
+    /**
+     * 답안 비교. 둘 다 숫자면 값으로 비교한다("0.3" = "0.300" = "약 .3").
+     * 한쪽만 숫자면 다른 답이다. 글자만 남기면 "0.3"과 "03"이 같아지기 때문이다.
+     * 나머지는 {@link #sameText}와 같다.
+     */
+    public static boolean sameAnswer(String input, String answer) {
+        BigDecimal a = number(input), b = number(answer);
+        if (a != null && b != null) return a.compareTo(b) == 0;
+        if (a != null || b != null) return false;
+        return sameText(input, answer);
+    }
+
+    private static final Pattern NUMBER = Pattern.compile("[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)");
+
+    /** 숫자 하나로만 된 답이면 그 값("약 0.389" 포함), 아니면 null. */
+    static BigDecimal number(String text) {
+        if (text == null) return null;
+        String value = Normalizer.normalize(text, Normalizer.Form.NFKC).strip();
+        if (value.startsWith("약")) value = value.substring(1).strip();
+        return NUMBER.matcher(value).matches() ? new BigDecimal(value) : null;
     }
 
     /** 공백으로 나눈 검색어 조각들(정규화 후 빈 조각 제외). "2아웃 포스" → [2아웃, 포스]. */
