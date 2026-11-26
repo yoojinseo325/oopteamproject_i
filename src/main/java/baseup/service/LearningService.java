@@ -26,6 +26,8 @@ public final class LearningService implements QuestionSource {
     private final Repository<StepCompletion> completionRepository;
     private final Manager<StepCompletion> completions;
     private UserProfile currentUser;
+    /** 관리자 계정으로 로그인한 동안만 true. 사용자가 바뀌면 다시 false가 된다. */
+    private boolean allStepsUnlocked;
 
     public LearningService(Catalog catalog, Path userDir) throws IOException {
         this(catalog, userDir, Clock.systemUTC());
@@ -55,8 +57,12 @@ public final class LearningService implements QuestionSource {
     }
 
     public LearningProgress progress() {
-        return new LearningProgress(catalog.steps(), completions.all(), currentUser.id());
+        return new LearningProgress(catalog.steps(), completions.all(), currentUser.id(), allStepsUnlocked);
     }
+
+    /** 현재 사용자에게 모든 STEP을 열어 둘지 정한다. 관리자 로그인(AuthService)에서만 켠다. */
+    public void setAllStepsUnlocked(boolean unlocked) { allStepsUnlocked = unlocked; }
+    public boolean allStepsUnlocked() { return allStepsUnlocked; }
 
     public LearningStatistics statistics() {
         return new LearningStatistics(catalog.questions(), attempts());
@@ -69,7 +75,7 @@ public final class LearningService implements QuestionSource {
     public Catalog catalog() { return catalog; }
     public UserProfile user() { return currentUser; }
     public List<UserProfile> profiles() { return profiles.all(); }
-    public void selectUser(String id) { currentUser = profiles.find(id).orElseThrow(); }
+    public void selectUser(String id) { currentUser = profiles.find(id).orElseThrow(); allStepsUnlocked = false; }
     public UserProfile addProfile(String nickname) throws IOException {
         String name = nickname.strip();
         if (name.isEmpty() || name.length() > 16 || name.chars().anyMatch(Character::isISOControl))
@@ -79,6 +85,7 @@ public final class LearningService implements QuestionSource {
         UserProfile created = new UserProfile(UUID.randomUUID().toString(), name);
         saveAdded(profileRepository, profiles, created);
         currentUser = created;
+        allStepsUnlocked = false;
         return created;
     }
     public QuizSession start(QuestionSelector selector) { return new QuizSession(selector.select(this), currentUser.id(), clock); }

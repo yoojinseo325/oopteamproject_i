@@ -10,8 +10,15 @@ import java.util.stream.Collectors;
 public final class LearningProgress {
     private final List<LearningStep> steps;
     private final Set<Integer> completedKeys;
+    private final boolean allUnlocked;
 
     public LearningProgress(List<LearningStep> steps, List<StepCompletion> completions, String userId) {
+        this(steps, completions, userId, false);
+    }
+
+    /** allUnlocked가 true면 완료 여부와 관계없이 모든 단계를 열어 둔다(관리자 계정). 완료 기록은 그대로 센다. */
+    public LearningProgress(List<LearningStep> steps, List<StepCompletion> completions, String userId, boolean allUnlocked) {
+        this.allUnlocked = allUnlocked;
         this.steps = List.copyOf(steps);
         completedKeys = completions.stream().filter(c -> c.userId().equals(userId))
                 .map(StepCompletion::step).collect(Collectors.toUnmodifiableSet());
@@ -32,7 +39,10 @@ public final class LearningProgress {
         return steps.stream().filter(s -> !stepCompleted(s.number())).mapToInt(LearningStep::number).findFirst().orElse(steps.size());
     }
 
-    public boolean stepUnlocked(int number) { return stepCompleted(number) || number == nextStepNumber(); }
+    public boolean stepUnlocked(int number) {
+        step(number); // 없는 단계는 관리자라도 예외
+        return allUnlocked || stepCompleted(number) || number == nextStepNumber();
+    }
 
     public boolean courseComplete() { return completedSteps() == steps.size(); }
 

@@ -20,6 +20,11 @@ import static baseup.repository.Tsv.line;
 
 /** 서버 없이 로컬 사용자 ID/비밀번호를 기존 학습 프로필에 연결한다. */
 public final class AuthService {
+    /** 관리자 로그인 ID. 이 계정으로 로그인하면 모든 STEP이 열린다(시연·점검용). */
+    public static final String ADMIN_ID = "admin";
+    /** 관리자 계정이 처음 만들어질 때의 비밀번호. 실행 옵션 -Dbaseup.adminPassword=... 로 바꿀 수 있다. */
+    public static final String DEFAULT_ADMIN_PASSWORD = "baseup1234";
+    static final String ADMIN_NICKNAME = "관리자";
     private static final int ITERATIONS = 210_000;
     private static final int KEY_BITS = 256;
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -55,7 +60,37 @@ public final class AuthService {
         }
         // 비밀번호가 검증된 경우에만 현재 학습 사용자를 변경한다.
         learning.selectUser(account.profileId());
+        learning.setAllStepsUnlocked(isAdmin(id));
         return learning.user();
+    }
+
+    public static boolean isAdmin(String loginId) {
+        return loginId != null && ADMIN_ID.equals(loginId.strip().toLowerCase(Locale.ROOT));
+    }
+    public boolean adminExists() { return accounts.stream().anyMatch(a -> a.id().equals(ADMIN_ID)); }
+
+    /**
+     * 관리자 계정(admin)이 없으면 만든다. 이미 있으면 아무것도 바꾸지 않는다(비밀번호도 그대로).
+     * 닉네임 "관리자" 프로필이 계정 없이 남아 있으면 그 기록에 연결하고, 없으면 새 프로필을 만든다.
+     * 현재 학습 사용자는 바꾸지 않는다.
+     */
+    public void ensureAdmin(char[] password) throws IOException {
+        if (adminExists()) return;
+        UserProfile before = learning.user();
+        boolean unlockedBefore = learning.allStepsUnlocked();
+        try {
+            UserProfile spare = unlinkedProfiles().stream()
+                    .filter(p -> p.nickname().equals(ADMIN_NICKNAME)).findFirst().orElse(null);
+            if (spare != null) linkExisting(ADMIN_ID, password, spare.id());
+            else {
+                String name = learning.profiles().stream().anyMatch(p -> p.nickname().equalsIgnoreCase(ADMIN_NICKNAME))
+                        ? ADMIN_NICKNAME + "_admin" : ADMIN_NICKNAME;
+                registerNew(ADMIN_ID, password, name);
+            }
+        } finally {
+            learning.selectUser(before.id());
+            learning.setAllStepsUnlocked(unlockedBefore);
+        }
     }
 
     public UserProfile registerNew(String loginId, char[] password, String nickname) throws IOException {

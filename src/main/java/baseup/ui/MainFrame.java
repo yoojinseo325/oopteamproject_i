@@ -66,6 +66,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
         Dimension screen=Toolkit.getDefaultToolkit().getScreenSize();
         setSize(Math.min(1360,screen.width-70),Math.min(940,screen.height-70));
         setLocationRelativeTo(null); showPage("home");
+        if(service.allStepsUnlocked()) message("관리자 계정으로 로그인했습니다. 모든 STEP을 순서와 관계없이 열 수 있습니다.");
         showIntro();
     }
     /**
@@ -157,7 +158,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
                 "미션 나가기",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION;
     }
     private void refreshHeader() {
-        xp.setText(service.rank()+"   /   "+service.xp()+" XP"); profile.setText(loggedIn()?service.user().nickname()+"  · 로그아웃":"로그인");
+        xp.setText((service.allStepsUnlocked()?"관리자 · 모든 STEP 열림   /   ":"")+service.rank()+"   /   "+service.xp()+" XP"); profile.setText(loggedIn()?service.user().nickname()+"  · 로그아웃":"로그인");
     }
     @Override public void showPage(String page) {
         currentPage=page; refreshHeader();

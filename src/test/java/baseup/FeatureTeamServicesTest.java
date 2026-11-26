@@ -31,7 +31,48 @@ public final class FeatureTeamServicesTest {
         dailyRule(catalog);
         authSession(catalog);
         dashboard(catalog);
-        System.out.println("PASS: " + checks + " progress/daily-rule/auth-session/dashboard checks");
+        adminAccount(catalog);
+        System.out.println("PASS: " + checks + " progress/daily-rule/auth-session/dashboard/admin checks");
+    }
+
+    /** 관리자 계정: 처음 실행할 때 한 번 만들어지고, 로그인한 동안만 모든 STEP이 열린다. */
+    private static void adminAccount(Catalog catalog) throws Exception {
+        Path dir = Files.createTempDirectory(Path.of("build"), "admin-test-");
+        LearningService learning = new LearningService(catalog, dir);
+        AuthService auth = new AuthService(learning, dir);
+        int last = learning.steps().size();
+        UserProfile starter = learning.user();
+        check(!auth.adminExists(), "no admin before setup");
+        auth.ensureAdmin("baseup1234".toCharArray());
+        check(auth.adminExists() && learning.user().equals(starter) && !learning.allStepsUnlocked(), "setup keeps current user");
+        auth.ensureAdmin("different-pass".toCharArray());
+        auth.authenticate("ADMIN", "baseup1234".toCharArray());
+        check(learning.user().nickname().equals("관리자"), "admin profile nickname");
+        check(learning.allStepsUnlocked() && learning.stepUnlocked(last) && learning.stepUnlocked(7), "admin opens every step");
+        check(learning.completedSteps() == 0, "unlocking is not completing");
+        QuizSession jump = learning.startStep(7);
+        check(jump.size() >= 2 && jump.stepNumber() == 7, "admin can start STEP 7 directly");
+        rejects(() -> learning.stepUnlocked(last + 1), "missing step still rejected");
+        try { auth.authenticate("admin", "different-pass".toCharArray()); throw new AssertionError("password changed"); }
+        catch (IllegalArgumentException expected) { checks++; }
+
+        auth.registerNew("student01", "password123".toCharArray(), "학생");
+        auth.authenticate("student01", "password123".toCharArray());
+        check(!learning.allStepsUnlocked() && !learning.stepUnlocked(7) && learning.stepUnlocked(1), "normal account stays locked");
+        rejects(() -> learning.startStep(7), "normal account cannot jump");
+        rejects(() -> auth.registerNew("admin", "password123".toCharArray(), "가짜"), "admin id is taken");
+
+        AuthService reopened = new AuthService(new LearningService(catalog, dir), dir);
+        check(reopened.adminExists(), "admin persists after restart");
+
+        // 예전에 계정 없이 만든 "관리자" 프로필이 있으면 그 기록에 연결한다.
+        Path old = Files.createTempDirectory(Path.of("build"), "admin-link-test-");
+        LearningService legacy = new LearningService(catalog, old);
+        UserProfile spare = legacy.addProfile("관리자");
+        AuthService legacyAuth = new AuthService(legacy, old);
+        legacyAuth.ensureAdmin("baseup1234".toCharArray());
+        legacyAuth.authenticate("admin", "baseup1234".toCharArray());
+        check(legacy.user().equals(spare) && legacy.profiles().size() == 2, "existing 관리자 profile reused");
     }
 
     /** 기능 4: 마이페이지 정답률(누적·난이도별·최근). */

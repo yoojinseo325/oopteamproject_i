@@ -29,6 +29,8 @@ public final class App {
             }));
             LearningService service = new LearningService(new Catalog(root.resolve("data")), userDir);
             AuthService auth = new AuthService(service, userDir);
+            // 시연·점검용 관리자 계정(모든 STEP 열림). 이미 있으면 그대로 둔다.
+            auth.ensureAdmin(System.getProperty("baseup.adminPassword", AuthService.DEFAULT_ADMIN_PASSWORD).toCharArray());
             SwingUtilities.invokeLater(() -> showLogin(service, auth, root));
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, "BASEUP을 시작할 수 없습니다.\n\n" + e.getMessage()
