@@ -60,7 +60,7 @@ V2 삽화의 인물은 일반적인 야구 선수 그림입니다. KBO 선수·�
 | 선수·구단 | `data/players.tsv`, `data/teams.tsv` |
 | 개념과 제출 후 카드 | `data/rules.tsv` |
 | 순서·STEP 확장 | `data/steps.tsv` |
-| 홈·경로·규칙·기록·메모 | `ui/HomePanel.java`, `ui/LearningPathPanel.java`, `ui/RuleLibraryPanel.java`, `ui/RecordsPanel.java`, `ui/NotesPanel.java` |
+| 홈·규칙 학습·퀴즈·기록·메모 | `ui/HomeScreen.java`, `ui/RuleBookScreen.java`, `ui/RuleDetailScreen.java`, `ui/QuizScreen.java`, `ui/SeasonMap.java`, `ui/RecordsScreen.java`, `ui/NotesScreen.java` |
 | 퀴즈 조립·입력·해설 | `ui/QuizPanel.java`, `ui/QuizAnswerPanel.java`, `ui/QuizFeedbackPanel.java` |
 | 그림·도식 | `ui/ImageQuestionPanel.java`, `ui/SceneQuestionPanel.java`, `ui/ImageView.java`, `ui/FieldPanel.java` |
 | 출제·복습 | `service/StepSelector.java`, `service/ReviewPolicy.java` |
@@ -83,7 +83,7 @@ V2 삽화의 인물은 일반적인 야구 선수 그림입니다. KBO 선수·�
 
 ## 규칙 백과사전·검색 (기능 5·6)
 
-로직은 `service/RuleEncyclopedia.java`, 문자열 정규화는 `common/TextNormalizer.java`에 있습니다. 화면 상태를 갖지 않으므로 UI 어디서든 `new RuleEncyclopedia(service.catalog())`로 만들어 씁니다.
+화면은 사이드바 "규칙 학습"(`ui/RuleBookScreen.java` 카드 목록 → `ui/RuleDetailScreen.java` 상세, 이전/다음 규칙과 ←/→ 키)입니다. 로직은 `service/RuleEncyclopedia.java`, 문자열 정규화는 `common/TextNormalizer.java`에 있습니다. 화면 상태를 갖지 않으므로 UI 어디서든 `new RuleEncyclopedia(service.catalog())`로 만들어 씁니다.
 
 | 메서드 | 용도 |
 | --- | --- |

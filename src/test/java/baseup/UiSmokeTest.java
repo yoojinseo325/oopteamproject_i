@@ -40,6 +40,14 @@ public final class UiSmokeTest {
     private static void click(String text) {clickButton(components().stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(b->text.equals(b.getText())).findFirst().orElseThrow(()->new AssertionError("Missing button: "+text)));}
     private static void named(String name) {clickButton(components().stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(b->name.equals(b.getName())).findFirst().orElseThrow(()->new AssertionError("Missing button: "+name)));}
     private static void clickButton(JButton b) {check(b.isEnabled(),"Button disabled: "+b.getText());b.doClick();}
+    private static Component byName(String name) {return components().stream().filter(c->name.equals(c.getName())).findFirst().orElse(null);}
+    /** 버튼이 아닌 카드·칩(마우스 클릭으로 동작)을 누른다. */
+    private static void clickLabel(String name) {
+        Component c=byName(name);check(c!=null,"Missing clickable: "+name);
+        for(var l:c.getMouseListeners()) l.mouseClicked(new java.awt.event.MouseEvent(c,java.awt.event.MouseEvent.MOUSE_CLICKED,System.currentTimeMillis(),0,5,5,1,false));
+    }
+    private static List<String> cards() {return components().stream().map(Component::getName).filter(n->n!=null&&n.startsWith("rule-card-")).toList();}
+    private static java.util.stream.Stream<String> labels() {return components().stream().filter(JLabel.class::isInstance).map(c->((JLabel)c).getText()).filter(Objects::nonNull);}
     private static void page(String id) throws Exception {
         edt(()->{Method m=MainFrame.class.getDeclaredMethod("showPage",String.class);m.setAccessible(true);m.invoke(frame,id);});
     }
@@ -49,8 +57,12 @@ public final class UiSmokeTest {
     }
     private static void snapshot(String name) throws Exception {
         edt(()->{});
+        edt(()->frame.validate());   // 첫 배치: 글 상자가 실제 폭을 알고 다시 배치를 예약한다
+        edt(()->{});                 // 예약된 다시 배치 요청을 처리
         edt(()->{
-            frame.validate();Container content=frame.getContentPane();
+            // 숨긴 창에서는 Swing이 다시 배치할 화면(스크롤 영역)을 자동 처리하지 않으므로, 보이는 창처럼 직접 마무리한다.
+            for(int pass=0;pass<3;pass++){frame.validate();for(Component c:components()) if(c instanceof JScrollPane sp&&!sp.isValid()) sp.validate();}
+            Container content=frame.getContentPane();
             BufferedImage image=new BufferedImage(content.getWidth(),content.getHeight(),BufferedImage.TYPE_INT_RGB);
             Graphics2D g=image.createGraphics();content.printAll(g);g.dispose();ImageIO.write(image,"png",images.resolve(name+".png").toFile());checks++;
         });
@@ -91,21 +103,41 @@ public final class UiSmokeTest {
             QuizSession first=active();
             while(first.stage()!=QuizSession.Stage.COMPLETE){answer(first);edt(()->click(first.index()+1==first.size()?"미션 결과 보기   →":"다음 상황으로   →"));}
             snapshot("05-result");check(service.attempts().size()==2&&service.solvedCount()==2&&service.completedSteps()==1,"Unified persistence");
-            edt(()->click("학습 경로 보기"));snapshot("06-missions");page("library");snapshot("07-library");
+            // 결과 화면의 "학습 경로 보기" → 퀴즈 허브의 시즌 코스(STEP 지도)
+            edt(()->click("학습 경로 보기"));snapshot("06-missions");
             edt(()->{
-                JTextField search=components().stream().filter(JTextField.class::isInstance).map(JTextField.class::cast).findFirst().orElseThrow();
-                search.setText("수비 인원");JList<?> list=components().stream().filter(JList.class::isInstance).map(JList.class::cast).findFirst().orElseThrow();
-                check(list.getModel().getSize()>=1&&((RuleConcept)list.getModel().getElementAt(0)).id().equals("defense"),"Rule searchable by title");
-                search.setText("보크");check(((RuleConcept)list.getModel().getElementAt(0)).id().equals("balk"),"Undiscovered rule visible in encyclopedia");
-                list.setSelectedIndex(0);
-                check(components().stream().anyMatch(c->"rule-detail".equals(c.getName())),"Rule with its own detail shows it");
-                search.setText("수비 인원");list.setSelectedIndex(0);
-                check(components().stream().noneMatch(c->"rule-detail".equals(c.getName())),"Detail equal to summary is not repeated");
-                search.setText("");list.setSelectedIndex(0);
-                components().stream().filter(JButton.class::isInstance).map(JButton.class::cast).filter(x->"page-next".equals(x.getName())).findFirst().orElseThrow().doClick();
-                check(list.getSelectedIndex()==1,"Next page button flips the encyclopedia");
-                search.setText("no-result-12345");check(list.getModel().getSize()==0,"Empty search");search.setText("수비 인원");click("북마크에 추가");
-            });check(service.bookmarked("defense"),"Image rule bookmark persisted");
+                check(byName("season-map")!=null,"Season map shown");
+                check(byName("quiz-random-situation")!=null&&byName("quiz-quick-general")!=null&&byName("quiz-review")!=null,"Quiz hub actions");
+                check(!((JButton)byName("season-step-7")).isEnabled(),"Situation STEP 7 still locked");
+                named("season-tab-general");
+                check(((JButton)byName("season-step-2")).isEnabled()&&!((JButton)byName("season-step-3")).isEnabled(),"Next general STEP opens in order");
+            });snapshot("06b-season-general");
+            page("quiz");snapshot("06c-quiz-hub");
+            // 규칙 학습 = 규칙 사전: 카드 그리드 + 검색 + 분류
+            page("library");snapshot("07-library");
+            edt(()->{
+                JTextField search=(JTextField)byName("rule-search");
+                check(cards().size()==service.catalog().rules().size(),"Every rule has a card");
+                search.setText("수비 인원");check(!cards().isEmpty()&&cards().get(0).equals("rule-card-defense"),"Rule searchable by title");
+                search.setText("보크");check(cards().contains("rule-card-balk"),"Undiscovered rule visible in rule book");
+                search.setText("no-result-12345");check(cards().isEmpty(),"Empty search");
+                search.setText("");
+                clickLabel("category-record");check(!cards().isEmpty()&&cards().stream().allMatch(id->service.catalog().rule(id.substring(10)).category()==RuleCategory.RECORD),"Category chip filters");
+                clickLabel("category-all");check(cards().size()==service.catalog().rules().size(),"All chip resets");
+                clickLabel("rule-card-balk");
+                check(byName("rule-hero")!=null&&byName("rule-detail")!=null,"Rule with its own detail shows it");
+            });snapshot("07b-rule-detail");
+            page("library");
+            edt(()->{
+                clickLabel("rule-card-defense");
+                check(byName("rule-detail")==null,"Detail equal to summary is not repeated");
+                int at=service.catalog().rules().stream().map(RuleConcept::id).toList().indexOf("defense")+1;
+                check(labels().anyMatch(t->t.startsWith(at+" / "+service.catalog().rules().size())),"Book page number");
+                named("rule-save");
+            });check(service.bookmarked("defense"),"Rule bookmark persisted");
+            int defenseAt=service.catalog().rules().stream().map(RuleConcept::id).toList().indexOf("defense")+1;
+            edt(()->{named("page-next");check(labels().anyMatch(t->t.startsWith((defenseAt+1)+" / ")),"Next page button flips the rule book");
+                named("page-prev");check(labels().anyMatch(t->t.startsWith(defenseAt+" / ")),"Previous page button flips back");});
             service.addNote("defense","투수와 포수도 수비 인원에 포함된다.");page("notes");snapshot("10-notes");
             for(Question q:service.catalog().questions()) {
                 QuizSession session=service.start(x->List.of(q));show(session);
@@ -154,7 +186,7 @@ public final class UiSmokeTest {
                 check(components().stream().anyMatch(c->"accuracy-dashboard".equals(c.getName())),"Mypage shows accuracy dashboard");
                 check(components().stream().filter(JLabel.class::isInstance).map(c->((JLabel)c).getText()).anyMatch("심화"::equals),"Mypage shows level accuracy");
             });
-            page("home");edt(()->frame.setSize(1100,760));snapshot("11-home-small");
+            page("home");edt(()->frame.setSize(1100,760));snapshot("11-home-small");page("library");snapshot("11b-library-small");edt(()->clickLabel(cards().get(0)));snapshot("11d-rule-small");page("quiz");snapshot("11c-quiz-small");
             for(String id:List.of("E01","Q01","U08","H02")) {
                 QuizSession session=service.start(x->List.of(service.catalog().question(id).orElseThrow()));show(session);snapshot("small-"+id);
                 edt(()->{

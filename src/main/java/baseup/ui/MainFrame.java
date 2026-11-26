@@ -15,7 +15,7 @@ import static baseup.ui.Theme.*;
 
 /**
  * 창 틀(사이드바·위쪽 막대·아래 상태줄)과 페이지 이동, 퀴즈 진행만 담당한다.
- * 각 페이지 화면은 Screen을 상속한 클래스(HomeScreen, StudyScreen, QuizScreen, MyPageScreen …)가 만든다.
+ * 각 페이지 화면은 Screen을 상속한 클래스(HomeScreen, RuleBookScreen, RuleDetailScreen, QuizScreen, MyPageScreen …)가 만든다.
  * 데이터 변경은 LearningService에 위임한다.
  */
 public final class MainFrame extends JFrame implements ScreenActions {
@@ -105,8 +105,8 @@ public final class MainFrame extends JFrame implements ScreenActions {
         }
         teamCard.setMaximumSize(new Dimension(Integer.MAX_VALUE,teamCard.getPreferredSize().height));Theme.add(body,teamCard);gap(body,22);
         Theme.add(body,label("   MY CLUBHOUSE",11,new Color(255,255,255,190),true)); gap(body,8);
-        String[][] menus={{"home","메인 홈","home"},{"missions","규칙 학습","mitt"},{"quiz","퀴즈","camera"},
-                {"library","규칙 백과사전","rulebook"},{"mypage","마이페이지","person"}};
+        // 규칙 학습 = 규칙 사전(읽기), 퀴즈 = 문제 풀이와 시즌 코스(STEP). 학습과 문제를 나눴다(교수님 피드백 6).
+        String[][] menus={{"home","메인 홈","home"},{"library","규칙 학습","mitt"},{"quiz","퀴즈","camera"},{"mypage","마이페이지","person"}};
         navigation.clear();
         for(String[] menu:menus) {
             Sidebar.NavButton b=new Sidebar.NavButton(menu[1],menu[2]);
@@ -166,12 +166,14 @@ public final class MainFrame extends JFrame implements ScreenActions {
             ((Sidebar.NavButton)entry.getValue()).active(entry.getKey().equals(navKey(page)));
         }
         JComponent content=switch(page) {
-            case "missions" -> new StudyScreen(this).build(); case "quiz" -> new QuizScreen(this).build();
-            case "library" -> { String rule=pendingRule; pendingRule=null; yield new RuleLibraryPanel(service, this, rule); }
+            case "missions" -> { scrollToSeason=true; yield new QuizScreen(this).build(); }
+            case "quiz" -> new QuizScreen(this).build();
+            case "library" -> new RuleBookScreen(this).build();
+            case "rule" -> new RuleDetailScreen(this).build();
             case "mypage" -> new MyPagePanel(service, this::navigate, this::accountAction, loggedIn(), this::startNext);
             case "records", "notes" -> new MyPageScreen(this, page).build(); default -> new HomeScreen(this).build();
         };
-        location.setText(switch(navKey(page)) {case "missions"->"규칙 학습";case "quiz"->"퀴즈";case "library"->"규칙 백과사전";case "mypage"->"마이페이지";default->"학습 홈";});
+        location.setText(switch(navKey(page)) {case "quiz"->"퀴즈";case "library"->page.equals("rule")?"규칙 학습  ·  규칙 사전  ·  "+service.catalog().rule(pendingRule).title():"규칙 학습  ·  규칙 사전";case "mypage"->"마이페이지";default->"학습 홈";});
         workspace.removeAll(); workspace.add(content,page); cards.show(workspace,page); workspace.revalidate(); workspace.repaint();
     }
     String nextAction() { return service.courseComplete() ? "새로운 조합으로 도전   →" : "STEP " + service.nextStepNumber() + " 시작하기   →"; }
@@ -187,8 +189,14 @@ public final class MainFrame extends JFrame implements ScreenActions {
             favoriteTeam = service.catalog().teams().stream().filter(t -> t.id().equals(System.getProperty("baseup.team"))).findFirst().orElse(null);
         return favoriteTeam;
     }
-    /** 메인 검색에서 고른 규칙을 '발견한 규칙' 화면에서 선택된 상태로 연다. */
-    void openRule(String ruleId) { pendingRule=ruleId; showPage("library"); }
+    // 규칙 사전 상태: 검색어·분류 칩, 상세 화면에서 넘길 규칙 순서(책장 순서)
+    String bookQuery=""; RuleCategory bookCategory; List<String> ruleTrail=List.of(); String ruleTrailLabel="전체 규칙";
+    // 퀴즈 화면 상태: 시즌 지도 탭(situation/general), 들어오자마자 시즌 코스로 내려갈지
+    String seasonTab="situation"; boolean scrollToSeason;
+    /** 메인 검색·오늘의 규칙에서 고른 규칙의 상세를 연다. 넘기기 순서는 전체 규칙. */
+    void openRule(String ruleId) { openRule(ruleId, service.catalog().rules().stream().map(RuleConcept::id).toList(), "전체 규칙"); }
+    /** 규칙 상세를 연다. trail은 이전/다음 규칙으로 넘길 순서(검색 결과나 분류). */
+    void openRule(String ruleId, List<String> trail, String label) { pendingRule=ruleId; ruleTrail=List.copyOf(trail); ruleTrailLabel=label; showPage("rule"); }
     private void pickTeam() {
         List<Team> teams=service.catalog().teams();
         String[] names=teams.stream().map(Team::name).toArray(String[]::new);
@@ -224,7 +232,7 @@ public final class MainFrame extends JFrame implements ScreenActions {
         message("미션 완료 · 모든 제출 기록을 저장했습니다.");
     }
     private static String navKey(String page) {
-        return switch (page) { case "records", "notes" -> "mypage"; default -> page; };
+        return switch (page) { case "records", "notes" -> "mypage"; case "missions" -> "quiz"; case "rule" -> "library"; default -> page; };
     }
     void profilesDialog() {
         if(!leaveQuiz())return;

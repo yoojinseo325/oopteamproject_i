@@ -38,16 +38,20 @@ public final class CircularProgress extends JComponent {
             int x = (getWidth() - d) / 2;
             int y = (getHeight() - d) / 2;
             g.setStroke(new BasicStroke(10f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.setColor(LINE);
+            g.setColor(new Color(0xDCF5E4));
             g.drawArc(x + 5, y + 5, d - 10, d - 10, 0, 360);
-            g.setColor(GREEN);
+            g.setPaint(new GradientPaint(0, 0, new Color(0x4ADE80), 0, getHeight(), new Color(0x16A34A)));
             g.drawArc(x + 5, y + 5, d - 10, d - 10, 90, -(int) Math.round(360.0 * (total == 0 ? 0 : (double)completed / total)));
-            String txt = percentage() + "%";
+            // 가운데: 완료한 단계 수(크게) + "/ 전체 단계"(작게)
+            String big = String.valueOf(completed), small = "/ " + total + " 단계";
             g.setColor(INK);
-            g.setFont(font(25, true));
+            g.setFont(font(26, true));
             FontMetrics metrics = g.getFontMetrics();
-            g.drawString(txt, (getWidth() - metrics.stringWidth(txt)) / 2,
-                    (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
+            int cy = getHeight() / 2;
+            g.drawString(big, (getWidth() - metrics.stringWidth(big)) / 2, cy + 4);
+            g.setFont(font(11, true)); g.setColor(MUTED);
+            FontMetrics sm = g.getFontMetrics();
+            g.drawString(small, (getWidth() - sm.stringWidth(small)) / 2, cy + 4 + sm.getHeight());
         } finally { g.dispose(); }
     }
 }

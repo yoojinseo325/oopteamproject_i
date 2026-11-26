@@ -52,7 +52,9 @@ public final class Theme {
         UIManager.put("TextField.caretForeground", INK);
     }
     public static JLabel label(String text, int size, Color color, boolean bold) {
-        JLabel label = new JLabel(text); label.setFont(font(size, bold)); label.setForeground(color); return label;
+        JLabel label = new JLabel(text); label.setFont(font(size, bold)); label.setForeground(color);
+        label.setBorder(new EmptyBorder(0, 0, 0, 3)); // 일부 글꼴에서 마지막 글자가 잘리지 않게 여유
+        return label;
     }
     public static JTextArea text(String value, int size, Color color) {
         JTextArea text = new JTextArea(value) {

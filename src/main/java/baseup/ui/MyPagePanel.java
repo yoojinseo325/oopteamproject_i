@@ -39,20 +39,21 @@ public final class MyPagePanel extends JPanel {
         this.loginEnabled=loginEnabled;
         this.continueLearning=continueLearning;
         setOpaque(false);
-        add(scroll(content()),BorderLayout.CENTER);
+        JScrollPane page=scroll(content()); page.getViewport().setBackground(WHITE); // PPT처럼 흰 바탕
+        add(page,BorderLayout.CENTER);
     }
 
     private JPanel content() {
         JPanel body=column();
         body.setBorder(new EmptyBorder(18,30,28,30));
+        Theme.add(body,label("MY LOCKER ROOM  ·  마이페이지",13,BookParts.ORANGE_TEXT,true)); gap(body,8);
         Theme.add(body,label("마이페이지",30,INK,true)); gap(body,8);
         Theme.add(body,label("내 학습 기록과 즐겨찾기 메모를 한곳에서 확인하세요.",14,MUTED,false)); gap(body,25);
         Theme.add(body,topCards()); gap(body,20);
-        Theme.add(body,label("학습 현황",21,INK,true)); gap(body,13);
+        Theme.add(body,BookParts.sectionTitle("학습 현황",null)); gap(body,13);
         Theme.add(body,statistics()); gap(body,14);
         Theme.add(body,accuracy()); gap(body,22);
-        Theme.add(body,label("나의 학습 공간",21,INK,true)); gap(body,5);
-        Theme.add(body,label("최근 진행한 내용으로 빠르게 돌아갈 수 있어요.",13,MUTED,false)); gap(body,15);
+        Theme.add(body,BookParts.sectionTitle("나의 학습 공간","최근 진행한 내용으로 빠르게 돌아갈 수 있어요.")); gap(body,15);
         Theme.add(body,quickLinks());
         return body;
     }
@@ -67,18 +68,18 @@ public final class MyPagePanel extends JPanel {
     }
 
     private JComponent profileCard() {
-        DashboardStyle.GradientCard card=new DashboardStyle.GradientCard(22);
+        BookParts.GradientCard card=new BookParts.GradientCard(new Color(0xEEF4FF),new Color(0xFFF1D2),new Color(0xEADFC8),22);
         card.setBorder(new EmptyBorder(18,24,18,24));
         card.setLayout(new BorderLayout(0,11));
-        card.add(label("CURRENT PROFILE",11,SOFT,true),BorderLayout.NORTH);
+        card.add(label("CURRENT PROFILE",11,BookParts.ORANGE_TEXT,true),BorderLayout.NORTH);
 
         JPanel identity=new JPanel(new BorderLayout(17,0));identity.setOpaque(false);
         JPanel avatar=new JPanel(new GridBagLayout()) {
             @Override protected void paintComponent(Graphics graphics) {
                 Graphics2D g=(Graphics2D) graphics.create();
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(new Color(0xE9F5EF));
                 int d=Math.min(getWidth(),getHeight())-2;
+                g.setPaint(new GradientPaint(0,0,new Color(0x5B8DEF),0,d,new Color(0x2F5FD0)));
                 g.fillOval((getWidth()-d)/2,(getHeight()-d)/2,d,d);
                 g.dispose();super.paintComponent(graphics);
             }
@@ -86,29 +87,29 @@ public final class MyPagePanel extends JPanel {
         avatar.setOpaque(false);avatar.setPreferredSize(new Dimension(65,65));
         String nickname=service.user().nickname();
         String initial=nickname.isEmpty()?"?":nickname.substring(0,1);
-        avatar.add(label(initial,27,DashboardStyle.ACCENT,true));identity.add(avatar,BorderLayout.WEST);
+        avatar.add(label(initial,27,WHITE,true));identity.add(avatar,BorderLayout.WEST);
         JPanel user=column();
-        Theme.add(user,label(nickname,24,WHITE,true));gap(user,8);
-        Theme.add(user,label(service.rank()+"  ·  "+service.xp()+" XP",13,new Color(0xD8EAE2),false));
+        Theme.add(user,label(nickname,26,INK,true));gap(user,8);
+        Theme.add(user,label(service.rank()+"  ·  "+service.xp()+" XP",14,BookParts.ORANGE_TEXT,true));
         identity.add(user,BorderLayout.CENTER);card.add(identity,BorderLayout.CENTER);
 
         JPanel latest=new JPanel(new BorderLayout(0,10));latest.setOpaque(false);
-        JSeparator separator=new JSeparator();separator.setForeground(new Color(0x639484));
-        separator.setBackground(new Color(0x639484));latest.add(separator,BorderLayout.NORTH);
+        JSeparator separator=new JSeparator();separator.setForeground(new Color(0xD7DEEA));
+        separator.setBackground(new Color(0xD7DEEA));latest.add(separator,BorderLayout.NORTH);
         JPanel bottom=new JPanel(new BorderLayout(0,7));bottom.setOpaque(false);
-        bottom.add(label("최근 학습",12,WHITE,true),BorderLayout.NORTH);
+        bottom.add(label("최근 학습",12,MUTED,true),BorderLayout.NORTH);
         JPanel recent=new JPanel(new BorderLayout(12,0));recent.setOpaque(false);
-        DashboardStyle.Surface diamond=new DashboardStyle.Surface(new Color(0x2A725A),14);
+        DashboardStyle.Surface diamond=new DashboardStyle.Surface(new Color(0x2EAA55),14);
         diamond.setLayout(new GridBagLayout());diamond.setPreferredSize(new Dimension(55,55));
         diamond.add(new JLabel(new DashboardStyle.Glyph("diamond",34,new Color(0xE1F2E9))));
         recent.add(diamond,BorderLayout.WEST);
         String recentTitle=service.lastStudiedStep().map(s->"STEP "+s.number()+" · "+s.goal())
                 .orElse("아직 진행한 학습이 없습니다.");
-        JTextArea recentLabel=text(recentTitle,13,WHITE);recentLabel.setFont(font(13,true));recentLabel.setRows(2);
+        JTextArea recentLabel=text(recentTitle,13,INK);recentLabel.setFont(font(13,true));recentLabel.setRows(2);
         recent.add(recentLabel,BorderLayout.CENTER);
-        JButton cont=button("이어서 학습  →",false,continueLearning);
+        JButton cont=BookParts.pillButton("이어서 학습  →",BookParts.YELLOW,true,continueLearning);
         cont.setToolTipText("다음 학습 단계의 문제를 시작합니다.");
-        cont.setPreferredSize(new Dimension(130,41));
+        cont.setPreferredSize(new Dimension(Math.max(150,cont.getPreferredSize().width),44));
         recent.add(cont,BorderLayout.EAST);
         bottom.add(recent,BorderLayout.CENTER);latest.add(bottom,BorderLayout.CENTER);
         card.add(latest,BorderLayout.SOUTH);
@@ -220,11 +221,11 @@ public final class MyPagePanel extends JPanel {
         c.gridx=1;c.weightx=0;c.fill=GridBagConstraints.VERTICAL;
         surface.add(divider(),c);
         c.gridx=2;c.weightx=1; c.fill=GridBagConstraints.BOTH;
-        surface.add(statCell("힌트 없이 해결",service.solvedCount()+"개"),c);
+        surface.add(statCell("힌트 없이 해결",service.solvedCount()+"개",BookParts.GREEN_OK),c);
         c.gridx=3;c.weightx=0;c.fill=GridBagConstraints.VERTICAL;
         surface.add(divider(),c);
         c.gridx=4;c.weightx=1;c.fill=GridBagConstraints.BOTH;
-        surface.add(statCell("누적 경험치",service.xp()+" XP"),c);
+        surface.add(statCell("누적 경험치",service.xp()+" XP",BookParts.ORANGE_TEXT),c);
         JPanel out=new JPanel(new BorderLayout());out.setOpaque(false);
         out.add(surface,BorderLayout.CENTER);
         out.setPreferredSize(new Dimension(960,141));out.setMaximumSize(new Dimension(Integer.MAX_VALUE,141));
@@ -292,11 +293,11 @@ public final class MyPagePanel extends JPanel {
         Theme.add(text,label(service.completedSteps()+" / "+service.steps().size()+"단계",13,MUTED,false));
         p.add(text);return p;
     }
-    private JPanel statCell(String title,String value) {
+    private JPanel statCell(String title,String value,Color tone) {
         JPanel p=new JPanel(new GridBagLayout());p.setOpaque(false);
         JPanel contents=column();
         Theme.add(contents,label(title,15,INK,true));gap(contents,11);
-        Theme.add(contents,label(value,29,DashboardStyle.DEEP,true));
+        Theme.add(contents,label(value,29,tone,true));
         p.add(contents);return p;
     }
 

@@ -25,7 +25,7 @@ V1은 합의와 확장의 출발점입니다. 팀원이 코드를 읽지 않은 
 | 통합·앱 시작 | App, MainFrame, ScreenActions | 화면 연결, 경로 설정, 통합 빌드 |
 | 퀴즈 상태·채점 | QuizSession, Question, QuizPanel | 새로운 미션 단계, 중간 이어하기 |
 | 장면 표현 | SceneQuestionPanel, ImageQuestionPanel, FieldPanel | 좌표 검수, 애니메이션, 클릭 영역 개선 |
-| 콘텐츠·사전 | RuleLibraryPanel, RuleConcept, Catalog | 규칙 검색 개선, 데이터 검수 도구 |
+| 콘텐츠·사전 | RuleBookScreen, RuleDetailScreen, RuleConcept, Catalog | 규칙 검색 개선, 데이터 검수 도구 |
 | 저장·사용자 | UserRepositories, Repository, FileRepository, LearningDialogs | 마이그레이션, 백업, 프로필 관리 |
 | 복습·성장 | ReviewPolicy, LearningProgress, LearningStatistics, StepSelector | 규칙별 복습 간격, 전이 문항 출제, 성장 지표 |
 | 메모·사용성 | NotesPanel, StudyNote, Theme | 메모 수정, 키보드/접근성, UI 시험 |

@@ -7,7 +7,7 @@
 ```mermaid
 flowchart LR
   App --> MainFrame
-  MainFrame --> Pages[HomePanel / LearningPathPanel / RuleLibraryPanel / RecordsPanel / NotesPanel]
+  MainFrame --> Pages[HomeScreen / RuleBookScreen / RuleDetailScreen / QuizScreen / MyPagePanel]
   MainFrame --> MissionResultPanel
   MainFrame --> LearningDialogs
   MainFrame --> QuizPanel
@@ -67,7 +67,8 @@ flowchart LR
 | 출제 | `ReviewSelector` | 기존 문항별 복습 API 유지 (기본 UI에서는 미사용) |
 | 창 | `MainFrame` | 공통 탐색·헤더, CardLayout, 진행 중인 미션 수명 관리 |
 | 탐색 계약 | `ScreenActions` | 페이지가 창 구현을 모르고 시작·이동·메모 입력·알림을 요청하는 인터페이스 |
-| 페이지 | `HomePanel`, `LearningPathPanel`, `RuleLibraryPanel`, `RecordsPanel`, `NotesPanel`, `MissionResultPanel` | 각 화면의 구성과 입력 처리 |
+| 페이지 | `HomeScreen`, `RuleBookScreen`(규칙 사전 카드), `RuleDetailScreen`(규칙 상세·넘기기), `QuizScreen`(퀴즈 허브·시즌 코스), `MyPagePanel`, `RecordsScreen`, `NotesScreen` | 각 화면의 구성과 입력 처리. 화면은 추상 클래스 `Screen`을 상속한다 |
+| 화면 부품 | `BookParts`(칩·그라데이션 카드·분류 아이콘·진행 링), `SeasonMap`(STEP 지도) | 발표 PPT 시안의 카드 디자인 |
 | 공통 화면 | `StatisticsPanel`, `LearningPathView`, `PageComponents` | 성취 요약·단계 목록·제목/문단 표현 재사용 |
 | 대화상자 | `LearningDialogs` | 프로필 선택/추가, 메모 입력 |
 | 퀴즈 조립 | `QuizPanel` | 단계에 맞는 패널 조립, 제출·다음 문제 서비스 호출 |

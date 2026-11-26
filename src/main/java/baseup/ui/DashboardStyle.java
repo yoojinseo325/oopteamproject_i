@@ -22,8 +22,12 @@ public final class DashboardStyle {
         @Override protected void paintComponent(Graphics graphics) {
             Graphics2D g=(Graphics2D)graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(new Color(15,30,60,12));   // 옅은 그림자 + 테두리: 흰 바탕 위에서도 카드가 구분된다(PPT 시안)
+            g.fillRoundRect(0,3,Math.max(1,getWidth()-1),Math.max(1,getHeight()-3),arc,arc);
             g.setColor(getBackground());
-            g.fillRoundRect(0,0,Math.max(1,getWidth()-1),Math.max(1,getHeight()-1),arc,arc);
+            g.fillRoundRect(0,0,Math.max(1,getWidth()-1),Math.max(1,getHeight()-4),arc,arc);
+            g.setColor(new Color(0xE3E8EF));
+            g.drawRoundRect(0,0,Math.max(1,getWidth()-1),Math.max(1,getHeight()-4),arc,arc);
             g.dispose(); super.paintComponent(graphics);
         }
     }
